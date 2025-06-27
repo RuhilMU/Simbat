@@ -17,10 +17,14 @@ class ClinicStockController extends Controller
     public function searchClinicStock(Request $request)
     {
         $query = $request->input('query');
+        $perPage = $request->input('per_page', 5);
         $drugs = Drug::where('name', 'like', "%{$query}%")->orWhere('code', 'like', "%{$query}%")->pluck('id');
-        $clinic = Clinic::with('data')->whereIn('drug_id',$drugs)->get();
-
-        return response()->json($clinic);
+        $clinic = Clinic::with('data')->whereIn('drug_id', $drugs)->paginate($perPage);
+        $pagination = $clinic->appends(['query' => $query])->links()->render();
+        return response()->json([
+            'data' => $clinic->items(),
+            'pagination' => $pagination,
+        ]);
     }
     public function index()
     {

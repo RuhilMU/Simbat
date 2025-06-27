@@ -126,51 +126,13 @@ class DrugController extends Controller
     public function update(Request $request, Drug $drug)
     {
         try {
-            $validate = $request->validate([
-                'category_id' => 'required|exists:categories,id',
-                'variant_id' => 'required|exists:variants,id',
-                'manufacture_id' => 'required|exists:manufactures,id',
-                'name' => 'required|string|min:3|max:255|unique:drugs,name,' . $drug->id,
-                'code' => 'unique:drugs,code,' . $drug->id,
-                'last_price' => 'nullable|integer|min:0',
-                'last_discount' => 'nullable|integer|min:0',
-                'maximum_capacity' => 'required|integer|min:1',
-                'minimum_capacity' => 'required|integer|min:0',
-                'pack_quantity' => 'required|integer|min:1',
-                'pack_margin' => 'required|integer|min:0',
-                'piece_quantity' => 'required|integer|min:1',
-                'piece_margin' => 'required|integer|min:0',
-                'piece_netto' => 'required|integer|min:1',
-                'piece_unit' => 'required|in:ml,mg,butir'
-            ], [
-                'name.unique' => 'Nama obat sudah ada',
-                'code.unique' => 'Kode obat sudah ada'
-            ]);
-            
-            $drug->update($validate);
+            $drug->update($request->all());
             $repacks = $drug->repacks();
             //melakukan update data harga terhadap semua data repack
             foreach ($repacks as $item) {
                 $item->update_price();
             }
             return redirect()->back()->with('success', 'Berhasil mengubah data obat');
-        } catch (\Illuminate\Validation\ValidationException $e) {
-            $allErrors = $e->errors();
-            $allAreDuplicates = true;
-            
-            foreach ($allErrors as $field => $errors) {
-                foreach ($errors as $error) {
-                    if ($error !== 'Nama obat sudah ada' && $error !== 'Kode obat sudah ada') {
-                        $allAreDuplicates = false;
-                        break 2;
-                    }
-                }
-            }
-            
-            if ($allAreDuplicates) {
-                return back()->withErrors($e->errors())->withInput();
-            }
-            return back()->with('error', 'Gagal mengubah data obat')->withInput();
         } catch (\Throwable $e) {
             return redirect()->back()->with('error', 'Gagal mengubah data obat');
         }
