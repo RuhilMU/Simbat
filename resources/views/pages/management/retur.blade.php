@@ -37,9 +37,9 @@
                 </thead>
                 <tbody id="retur-value"></tbody>
                 <tbody id="retur-data" class="text-gray-700">
-                    @foreach ($returs as $number => $item)
+                    @foreach ($returs as $item)
                         <tr class="border-b border-gray-200 hover:bg-gray-100">
-                            <td class="px-6 py-3">{{ $number + 1 }}</td>
+                            <td class="px-6 py-3">{{ $loop->iteration + ($returs->currentPage() - 1) * $returs->perPage() }}</td>
                             <td class="px-6 py-3">{{ $item->transaction()->code }}</td>
                             <td class="px-6 py-3 text-left">{{ $item->drug()->name }}</td>
                             <td class="px-6 py-3">{{ $item->detail()->quantity }}</td>
@@ -113,9 +113,9 @@
         function generateTableRow(item, number) {
             let createdAt = formatDate(item.created_at);
             let arriveDate = item.arrive ? formatDate(item.arrive) : "-";
-            let totalQuantity = item.detail ? item.detail.quantity : "-"; // Menyesuaikan jika data detail ada
-            let drugName = item.drug ? item.drug.name : "-"; // Menyesuaikan jika data drug ada
             let transactionCode = item.trans ? item.trans.code : "-";
+            let drugName = item.drug ? item.drug.name : "-";
+            let quantity = item.detail ? item.detail.quantity : "-";
             let routeUrl = `/management/retur/${item.id}`;
 
             return `
@@ -123,7 +123,7 @@
             <td class="px-6 py-3">${number + 1}</td>
             <td class="px-6 py-3">${transactionCode}</td>
             <td class="px-6 py-3 text-left">${drugName}</td>
-            <td class="px-6 py-3">${totalQuantity}</td>
+            <td class="px-6 py-3">${quantity}</td>
             <td class="px-6 py-3">${createdAt}</td>
             <td class="px-6 py-3">${arriveDate}</td>
             <td class="flex justify-center py-3">

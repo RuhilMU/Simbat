@@ -240,16 +240,43 @@ class DatabaseSeeder extends Seeder
     ];
     private $users = [
         [
-            "name" => "Super Arsyad",
+            "name" => "Super Admin",
             "role" => "super",
-            "avatar" => "avatar/Avatar.jpg"
+            "avatar" => "avatar/Avatar.jpg",
+            "email" => null,
+            "password" => null
+        ],
+        [
+            "name" => "Simklinik",
+            "role" => "clinic",
+            "avatar" => "avatar/Avatar.jpg",
+            "email" => "simklinik@simbat.disyfa.site",
+            "password" => "simklinik"
+        ],
+        [
+            "name" => "Dokter",
+            "role" => "doctor",
+            "avatar" => "avatar/Avatar.jpg",
+            "email" => "dokter@simbat.disyfa.site",
+            "password" => "dokter"
+        ],
+        [
+            "name" => "Apoteker",
+            "role" => "admin",
+            "avatar" => "avatar/Avatar.jpg",
+            "email" => "apoteker@simbat.disyfa.site",
+            "password" => "apoteker"
         ]
     ];
     public function run(): void
     {
         foreach ($this->users as $item) {
-            $item["password"] = Hash::make(env("SUPER_PASSWORD"));
-            $item["email"] = env("SUPER_EMAIL");
+            if ($item["role"] === "super") {
+                $item["password"] = Hash::make(env("SUPER_PASSWORD"));
+                $item["email"] = env("SUPER_EMAIL");
+            } else {
+                $item["password"] = Hash::make($item["password"]);
+            }
             User::create($item);
         }
         foreach ($this->categories as $item) {

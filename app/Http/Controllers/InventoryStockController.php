@@ -33,7 +33,13 @@ class InventoryStockController extends Controller
         $drug = $stock;
         $stock = Warehouse::where('drug_id',$drug->id)->first();
         $inflow = Transaction::where('variant','LPB')->pluck('id');
-        $details = TransactionDetail::where('drug_id',$drug->id)->whereIn('transaction_id',$inflow)->whereNot('stock',0)->orderBy('expired')->paginate(10,['*'],'expired');
+        $details = TransactionDetail::where('drug_id',$drug->id)
+            ->whereIn('transaction_id',$inflow)
+            ->whereNot('stock',0)
+            ->selectRaw('MIN(id) as id, expired, SUM(stock) as stock, drug_id')
+            ->groupBy('expired', 'drug_id')
+            ->orderBy('expired')
+            ->paginate(10,['*'],'expired');
         $transactions = TransactionDetail::with('transaction')->where('drug_id',$drug->id)->orderBy('created_at')->paginate(5,['*'],'transaction');
         return view("pages.inventory.stockDetail",compact('drug','stock','judul','details','transactions'));
     }
@@ -44,6 +50,13 @@ class InventoryStockController extends Controller
         if($request->isMethod('get')){
             return view("pages.inventory.retur",compact('batch','judul'));
         }elseif ($request->isMethod('post')) {
+            $validator = \Validator::make($request->all(), [
+                'quantity' => 'required|numeric|min:1',
+            ]);
+            if ($validator->fails()) {
+                session()->flash('error', 'Gagal mengembalikan obat');
+                return redirect()->back()->withInput();
+            }
             $transaction = Transaction::create([
                 "vendor_id"=>$batch->transaction->vendor()->id,
                 "destination"=>"warehouse",
@@ -88,6 +101,13 @@ class InventoryStockController extends Controller
         if($request->isMethod('get')){
             return view("pages.inventory.trash",compact('batch','judul'));
         }elseif($request->isMethod('post')){
+            $validator = \Validator::make($request->all(), [
+                'quantity' => 'required|numeric|min:1',
+            ]);
+            if ($validator->fails()) {
+                session()->flash('error', 'Gagal membuang obat');
+                return redirect()->back()->withInput();
+            }
             // dd($request);
             $transaction = Transaction::create([
                 "vendor_id"=>$batch->transaction->vendor()->id,

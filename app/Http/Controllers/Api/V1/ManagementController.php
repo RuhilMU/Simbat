@@ -27,65 +27,10 @@ class ManagementController extends ApiController
 {
     /**
      * @OA\Get(
-     *     path="/api/v1/management/search",
-     *     summary="Search management records",
-     *     tags={"Management"},
-     *     @OA\Parameter(
-     *         name="variant",
-     *         in="query",
-     *         required=true,
-     *         description="Type of record to search (bill, retur, trash)",
-     *         @OA\Schema(type="string", enum={"bill", "retur", "trash"})
-     *     ),
-     *     @OA\Parameter(
-     *         name="query",
-     *         in="query",
-     *         required=true,
-     *         description="Search query",
-     *         @OA\Schema(type="string")
-     *     ),
-     *     @OA\Response(
-     *         response=200,
-     *         description="Search results retrieved successfully",
-     *         @OA\JsonContent(
-     *             @OA\Property(property="status", type="string", example="success"),
-     *             @OA\Property(property="data", type="array", @OA\Items(type="object"))
-     *         )
-     *     )
-     * )
-     */
-    public function searchManagement(Request $request)
-    {
-        $variant = $request->input('variant');
-        $query = $request->input('query');
-        $transactions = Transaction::where('code', 'like', "%{$query}%")->pluck('id');
-        
-        if ($variant == 'bill') {
-            $bills = Bill::whereIn('transaction_id', $transactions)->with('transaction')->get();
-            return response()->json([
-                'status' => 'success',
-                'data' => $bills
-            ]);
-        } elseif ($variant == 'retur') {
-            $returs = Retur::whereIn('transaction_id', $transactions)->with('transaction')->get();
-            return response()->json([
-                'status' => 'success',
-                'data' => $returs
-            ]);
-        } elseif ($variant == 'trash') {
-            $trashes = Trash::whereIn('transaction_id', $transactions)->with('transaction')->get();
-            return response()->json([
-                'status' => 'success',
-                'data' => $trashes
-            ]);
-        }
-    }
-
-    /**
-     * @OA\Get(
      *     path="/api/v1/management/bills",
      *     summary="Get all bills",
      *     tags={"Management"},
+     *     security={{"bearerAuth":{}}},
      *     @OA\Parameter(
      *         name="start",
      *         in="query",
@@ -172,6 +117,7 @@ class ManagementController extends ApiController
      *     path="/api/v1/management/bills/{id}",
      *     summary="Get bill details",
      *     tags={"Management"},
+     *     security={{"bearerAuth":{}}},
      *     @OA\Parameter(
      *         name="id",
      *         in="path",
@@ -276,6 +222,7 @@ class ManagementController extends ApiController
      *     path="/api/v1/management/bills/{id}/pay",
      *     summary="Pay a bill",
      *     tags={"Management"},
+     *     security={{"bearerAuth":{}}},
      *     @OA\Parameter(
      *         name="id",
      *         in="path",
@@ -344,6 +291,7 @@ class ManagementController extends ApiController
      *     path="/api/v1/management/returns",
      *     summary="Get all returns",
      *     tags={"Management"},
+     *     security={{"bearerAuth":{}}},
      *     @OA\Parameter(
      *         name="start",
      *         in="query",
@@ -427,6 +375,7 @@ class ManagementController extends ApiController
      *     path="/api/v1/management/returns/{id}",
      *     summary="Get return details",
      *     tags={"Management"},
+     *     security={{"bearerAuth":{}}},
      *     @OA\Parameter(
      *         name="id",
      *         in="path",
@@ -519,6 +468,7 @@ class ManagementController extends ApiController
      *     path="/api/v1/management/returns",
      *     summary="Create a return",
      *     tags={"Management"},
+     *     security={{"bearerAuth":{}}},
      *     @OA\RequestBody(
      *         required=true,
      *         @OA\JsonContent(
@@ -651,6 +601,7 @@ class ManagementController extends ApiController
      *     path="/api/v1/management/returns/{id}/complete",
      *     summary="Complete a return",
      *     tags={"Management"},
+     *     security={{"bearerAuth":{}}},
      *     @OA\Parameter(
      *         name="id",
      *         in="path",
@@ -754,6 +705,7 @@ class ManagementController extends ApiController
      *     path="/api/v1/management/trash",
      *     summary="Get all trash records",
      *     tags={"Management"},
+     *     security={{"bearerAuth":{}}},
      *     @OA\Parameter(
      *         name="start",
      *         in="query",
@@ -835,6 +787,7 @@ class ManagementController extends ApiController
      *     path="/api/v1/management/trash/{id}",
      *     summary="Get trash details",
      *     tags={"Management"},
+     *     security={{"bearerAuth":{}}},
      *     @OA\Parameter(
      *         name="id",
      *         in="path",
@@ -908,6 +861,7 @@ class ManagementController extends ApiController
      *     path="/api/v1/management/trash",
      *     summary="Create a trash record",
      *     tags={"Management"},
+     *     security={{"bearerAuth":{}}},
      *     @OA\RequestBody(
      *         required=true,
      *         @OA\JsonContent(

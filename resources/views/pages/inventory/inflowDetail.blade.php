@@ -20,7 +20,13 @@
                     <span class="mr-2 font-normal text-black">No. LPB :</span>
                     <span>{{ $transaction->code }}</span>
                 </div>
-                <h1 class="text-center text-2xl font-bold">LAPORAN PENERIMAAN BARANG</h1>
+                <h1 class="text-center text-2xl font-bold">
+                    @if($transaction->variant === 'LPK')
+                        LAPORAN PENERIMAAN KLINIK
+                    @else
+                        LAPORAN PENERIMAAN BARANG
+                    @endif
+                </h1>
             </div>
             <div class="flex-1 ml-10">
                 <p class="text-sm mb-4 text-left">Tanggal: {{ Carbon::parse($transaction->created_at)->translatedFormat('j F Y') }}</p>

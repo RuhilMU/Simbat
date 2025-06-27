@@ -98,8 +98,7 @@ class UserController extends ApiController
      *             @OA\Property(property="name", type="string", example="John Doe"),
      *             @OA\Property(property="email", type="string", format="email", example="john@example.com"),
      *             @OA\Property(property="password", type="string", format="password", example="password123"),
-     *             @OA\Property(property="role", type="string", enum={"super", "admin", "doctor", "clinic"}, example="admin"),
-     *             @OA\Property(property="avatar", type="string", format="binary")
+     *             @OA\Property(property="role", type="string", enum={"super", "admin", "doctor", "clinic"}, example="admin")
      *         )
      *     ),
      *     @OA\Response(
@@ -347,10 +346,11 @@ class UserController extends ApiController
      *     @OA\RequestBody(
      *         required=true,
      *         @OA\JsonContent(
-     *             required={"name", "email"},
+     *             required={"name", "address", "phone", "logo"},
      *             @OA\Property(property="name", type="string", example="John Doe"),
-     *             @OA\Property(property="email", type="string", format="email", example="john@example.com"),
-     *             @OA\Property(property="avatar", type="string", format="binary")
+     *             @OA\Property(property="address", type="string", format="text", example="123 Main St"),
+     *             @OA\Property(property="phone", type="string", format="text", example="+1 (555) 555-5555"),
+     *             @OA\Property(property="logo", type="string", format="binary")
      *         )
      *     ),
      *     @OA\Response(
@@ -360,9 +360,8 @@ class UserController extends ApiController
      *             @OA\Property(property="data", type="object",
      *                 @OA\Property(property="id", type="integer", example=1),
      *                 @OA\Property(property="name", type="string", example="John Doe"),
-     *                 @OA\Property(property="email", type="string", example="john@example.com"),
-     *                 @OA\Property(property="role", type="string", example="admin"),
-     *                 @OA\Property(property="avatar", type="string", example="avatar/123456.jpg")
+     *                 @OA\Property(property="address", type="string", example="123 Main St"),
+     *                 @OA\Property(property="phone", type="string", example="+1 (555) 555-5555")
      *             )
      *         )
      *     ),
@@ -378,8 +377,9 @@ class UserController extends ApiController
 
         $validator = Validator::make($request->all(), [
             'name' => 'required|string|max:255',
-            'email' => 'required|string|email|max:255|unique:users,email,' . $user->id,
-            'avatar' => 'nullable|image|max:2048'
+            'address' => 'nullable|string|max:255',
+            'phone' => 'nullable|string|max:255',
+            'logo' => 'nullable|image|max:2048',
         ]);
 
         if ($validator->fails()) {
@@ -387,15 +387,17 @@ class UserController extends ApiController
         }
 
         try {
-            if ($request->hasFile('avatar')) {
-                Storage::disk('public')->delete($user->avatar);
-                $avatar = Storage::disk('public')->put('avatar', $request->file('avatar'));
-                $user->avatar = $avatar;
+            $profile = \App\Models\Profile::first();
+            if ($request->hasFile('logo')) {
+                Storage::disk('public')->delete($profile->logo);
+                $logo = Storage::disk('public')->put('profile', $request->file('logo'));
+                $profile->logo = $logo;
             }
-
-            $user->update($request->except(['avatar']));
-
-            return $this->successResponse($user, 'Profile updated successfully');
+            $profile->name = $request->input('name', $profile->name);
+            $profile->address = $request->input('address', $profile->address);
+            $profile->phone = $request->input('phone', $profile->phone);
+            $profile->save();
+            return $this->successResponse($profile, 'Clinic profile updated successfully');
         } catch (\Exception $e) {
             return $this->errorResponse('Failed to update profile: ' . $e->getMessage(), [], 500);
         }

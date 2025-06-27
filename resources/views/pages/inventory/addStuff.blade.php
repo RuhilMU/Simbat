@@ -21,20 +21,24 @@
             @csrf
             <input type="hidden" name="transaction">
             <input type="hidden" name="total">
+            <input type="hidden" name="destination" value="warehouse">
+            
             <div class="grid grid-cols-2  gap-4">
-                <select name="vendor_id" class="w-full rounded border border-gray-300 p-3 focus:outline-none focus:ring-2 focus:ring-blue-500">
-                    <option selected disabled>Inputkan vendor</option>
-                    @foreach ($vendors as $item)
-                    <option value="{{ $item->id }}">{{ $item->name }}</option>
-                    @endforeach
-                </select>
-                <div class="flex">
-                    <select name="method" class="w-full rounded-s border border-gray-300 p-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
-                        <option selected disabled>Bayar Langsung / Bayar Tempo</option>
-                        <option value="cash">Bayar Langsung</option>
-                        <option value="credit">Bayar Tempo</option>
+                <div>
+                    <select name="vendor_id" class="w-full rounded border border-gray-300 p-3 focus:outline-none focus:ring-2 focus:ring-blue-500 @error('vendor_id') border-red-500 @enderror">
+                        <option selected disabled>Inputkan vendor</option>
+                        @foreach ($vendors as $item)
+                        <option value="{{ $item->id }}" {{ old('vendor_id') == $item->id ? 'selected' : '' }}>{{ $item->name }}</option>
+                        @endforeach
                     </select>
-                    <input name="due" type="date" class="w-full rounded-e border border-gray-300 p-2 focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                </div>
+                <div class="flex">
+                    <select name="method" class="w-full rounded-s border border-gray-300 p-2 focus:outline-none focus:ring-2 focus:ring-blue-500 @error('method') border-red-500 @enderror">
+                        <option selected disabled>Bayar Langsung / Bayar Tempo</option>
+                        <option value="cash" {{ old('method') == 'cash' ? 'selected' : '' }}>Bayar Langsung</option>
+                        <option value="credit" {{ old('method') == 'credit' ? 'selected' : '' }}>Bayar Tempo</option>
+                    </select>
+                    <input name="due" type="date" class="w-full rounded-e border border-gray-300 p-2 focus:outline-none focus:ring-2 focus:ring-blue-500 @error('due') border-red-500 @enderror" value="{{ old('due') }}" />
                 </div>
             </div>
         </form>
@@ -149,7 +153,7 @@
         </button>
 
         <!-- Tambahkan Form -->
-        <form action="{{ route('inventory.import') }}" method="POST" enctype="multipart/form-data">
+        <form id="import-inventory-form" action="{{ route('inventory.import') }}" method="POST" enctype="multipart/form-data">
             @csrf  <!-- Token CSRF wajib untuk keamanan Laravel -->
 
             <div class="flex items-center justify-center w-full mb-6 mt-6">
@@ -177,13 +181,44 @@
                     Batal
                 </button>
                 <button type="submit" class="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-700 focus:outline-none">
-                    Tambah
+                    Import Excel
                 </button>
             </div>
         </form>
     </div>
 </div>
 
+<div id="destinationModal" class="modal fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden">
+    <div class="bg-white rounded-lg shadow-lg p-6 w-96 relative">
+        <button type="button" class="absolute top-3 right-3 text-gray-400 hover:text-gray-600"
+            onclick="closeDestinationModal()">
+            <svg class="w-4 h-4" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none"
+                viewBox="0 0 14 14">
+                <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                    d="M1 1l6 6m0 0l6 6M7 7l6-6M7 7L1 13" />
+            </svg>
+            <span class="sr-only">Close modal</span>
+        </button>
+        <div class="text-center">
+            <svg class="mx-auto mb-4 text-gray-400 w-12 h-12" aria-hidden="true" xmlns="http://www.w3.org/2000/svg"
+                fill="none" viewBox="0 0 20 20">
+                <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                    d="M10 11V6m0 8h.01M19 10a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+            </svg>
+            <h3 class="text-lg font-semibold text-gray-700 mb-2">Pilih tujuan penempatan obat?</h3>
+        </div>
+        <div class="flex justify-center space-x-4">
+            <button onclick="selectDestination('warehouse')"
+                class="px-4 py-2 bg-gray-200 text-white text-gray-900 rounded-lg hover:bg-blue-600 focus:outline-none">
+               Inventory
+            </button>
+            <button onclick="selectDestination('clinic')" type="button"
+                class="px-4 py-2 bg-gray-200 text-white text-gray-900 rounded-lg hover:bg-blue-600 focus:outline-none">
+                Klinik
+            </button>
+        </div>
+    </div>
+</div>
 
 <script>
     let deleteForItem = null;
@@ -294,19 +329,103 @@
         let expired = document.querySelector("input[name='expired']")
         let input = [drug, quantity, unit, price, expired]
         let datainput = input.map(e => e.value)
-        const status = true
-        datainput.forEach(e => {
-            if (e == "") {
-                status = false
-            }
-        });
-        if (status) {
-            data.push(datainput)
-            draw()
-            input.forEach(e => {
-                e.value = null
-            });
+        
+        if (datainput[0] === "") {
+            showToastError('Silakan pilih obat terlebih dahulu');
+            return;
         }
+        
+        if (datainput[1] === "" || parseInt(datainput[1]) <= 0) {
+            showToastError('Jumlah harus lebih dari 0');
+            return;
+        }
+        
+        if (datainput[3] === "" || parseFloat(datainput[3]) <= 0) {
+            showToastError('Harga harus lebih dari 0');
+            return;
+        }
+        
+        if (datainput[4] === "") {
+            showToastError('Silakan pilih tanggal expired');
+            return;
+        }
+        
+        const expiredDate = new Date(datainput[4]);
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        
+        if (expiredDate < today) {
+            showToastError('Tanggal expired tidak boleh di masa lalu');
+            return;
+        }
+        
+        const existingIndex = data.findIndex(item => 
+            item[0] === datainput[0] && item[4] === datainput[4]
+        );
+        if (existingIndex !== -1) {
+            data[existingIndex][1] = (parseInt(data[existingIndex][1]) + parseInt(datainput[1])).toString();
+            data[existingIndex][3] = (parseFloat(data[existingIndex][3]) + parseFloat(datainput[3])).toString();
+            showToastSuccess(`Jumlah ${datainput[0]} (exp: ${datainput[4]}) ditambahkan menjadi ${data[existingIndex][1]}`);
+            draw();
+            input.forEach(e => { e.value = null; });
+            return;
+        }
+        data.push(datainput);
+        showToastSuccess(`Berhasil menambahkan ${datainput[1]} ${datainput[2]} ${datainput[0]}`);
+        draw();
+        input.forEach(e => { e.value = null; });
+    }
+
+    function showToastError(message) {
+        const toast = document.createElement('div');
+        toast.id = 'temp-toast-error';
+        toast.className = 'fixed right-5 top-5 mb-4 flex w-full max-w-xs items-center rounded-lg bg-white p-4 text-gray-500 shadow light:bg-gray-800 light:text-gray-400';
+        toast.innerHTML = `
+            <div class="inline-flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-red-100 text-red-500 light:bg-red-800 light:text-green-200">
+                <svg class="w-5 h-5" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="currentColor" viewBox="0 0 20 20">
+                    <path d="M10 .5a9.5 9.5 0 1 0 9.5 9.5A9.51 9.51 0 0 0 10 .5Zm3.707 11.793a1 1 0 1 1-1.414 1.414L10 11.414l-2.293 2.293a1 1 0 0 1-1.414-1.414L8.586 10 6.293 7.707a1 1 0 0 1 1.414-1.414L10 8.586l2.293-2.293a1 1 0 0 1 1.414 1.414L11.414 10l2.293 2.293Z" />
+                </svg>
+            </div>
+            <div class="ml-3 text-sm font-normal">${message}</div>
+            <button type="button" onclick="this.parentElement.remove()" class="-mx-1.5 -my-1.5 ml-auto inline-flex h-8 w-8 items-center justify-center rounded-lg bg-white p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-900 focus:ring-2 focus:ring-gray-300 light:bg-gray-800 light:text-gray-500 light:hover:bg-gray-700 light:hover:text-white">
+                <svg class="h-3 w-3" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 14 14">
+                    <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m1 1 6 6m0 0l6 6M7 7l6-6M7 7L1 13" />
+                </svg>
+            </button>
+        `;
+        document.body.appendChild(toast);
+        
+        setTimeout(() => {
+            if (toast.parentElement) {
+                toast.remove();
+            }
+        }, 3000);
+    }
+
+    function showToastSuccess(message) {
+        const toast = document.createElement('div');
+        toast.id = 'temp-toast-success';
+        toast.className = 'fixed right-5 top-5 mb-4 flex w-full max-w-xs items-center rounded-lg bg-white p-4 text-gray-500 shadow light:bg-gray-800 light:text-gray-400';
+        toast.innerHTML = `
+            <div class="inline-flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-green-100 text-green-500 light:bg-green-800 light:text-green-200">
+                <svg class="h-5 w-5" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="currentColor" viewBox="0 0 20 20">
+                    <path d="M10 .5a9.5 9.5 0 1 0 9.5 9.5A9.51 9.51 0 0 0 10 .5Zm3.707 8.207-4 4a1 1 0 0 1-1.414 0l-2-2a1 1 0 0 1 1.414-1.414L9 10.586l3.293-3.293a1 1 0 0 1 1.414 1.414Z" />
+                </svg>
+            </div>
+            <div class="ml-3 text-sm font-normal">${message}</div>
+            <button type="button" onclick="this.parentElement.remove()" class="-mx-1.5 -my-1.5 ml-auto inline-flex h-8 w-8 items-center justify-center rounded-lg bg-white p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-900 focus:ring-2 focus:ring-gray-300 light:bg-gray-800 light:text-gray-500 light:hover:bg-gray-700 light:hover:text-white">
+                <svg class="h-3 w-3" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 14 14">
+                    <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m1 1 6 6m0 0l6 6M7 7l6-6M7 7L1 13" />
+                </svg>
+            </button>
+        `;
+        document.body.appendChild(toast);
+        
+        setTimeout(() => {
+            if (toast.parentElement) {
+                toast.remove();
+            }
+        }, 3000);
     }
 
     function draw() {
@@ -323,14 +442,14 @@
     }
 
     function row(datainput, i) {
-        [drug, quantity, unit, price, expired] = datainput
-        total += parseInt(price)
+        [drug, quantity, unit, piece_price, expired] = datainput
+        total += parseFloat(piece_price) * parseInt(quantity)
         return `<tr class="border-b border-gray-200 hover:bg-gray-100 text-center">
                                 <td>${i + 1}</td>
                                 <td class="text-left">${drug}</td>
                                 <td>${quantity} ${unit}</td>
-                                <td>${price/quantity}</td>
-                                <td>${price}</td>
+                                <td>${piece_price}</td>
+                                <td>${parseFloat(piece_price) * parseInt(quantity)}</td>
                                 <td>${expired}</td>
                                 <td class="py-2">
                                     <button type="button" onclick="showDeleteModal(${i})"
@@ -394,8 +513,8 @@
                 name: e[0],
                 quantity: parseInt(e[1]),
                 unit: e[2],
-                piece_price: parseFloat(e[3]) / e[1],
-                price: parseFloat(e[3]),
+                piece_price: parseFloat(e[3]),
+                price: parseFloat(e[3]) * parseInt(e[1]),
                 expired: e[4]
             };
         });
@@ -404,22 +523,117 @@
         showModal('add', 'add-stuff-form')
     }
 
-    function customBuatModal(method,form) {
+    function customBuatModal(method, form) {
+        const vendorSelect = document.querySelector("select[name='vendor_id']");
+        if (vendorSelect && !vendorSelect.value) {
+            showToastError('Silakan pilih vendor terlebih dahulu');
+            return;
+        }
 
+        const methodSelect = document.querySelector("select[name='method']");
+        if (methodSelect && !methodSelect.value) {
+            showToastError('Silakan pilih metode pembayaran terlebih dahulu');
+            return;
+        }
+        if (methodSelect && methodSelect.value === 'credit') {
+            const dueInput = document.querySelector("input[name='due']");
+            if (dueInput && !dueInput.value) {
+                showToastError('Silakan pilih tanggal jatuh tempo untuk pembayaran kredit');
+                return;
+            }
+            const dueDate = new Date(dueInput.value);
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            if (dueDate <= today) {
+                showToastError('Tanggal jatuh tempo harus di masa depan');
+                return;
+            }
+        }
+        if (data.length === 0) {
+            showToastError('Silakan tambahkan minimal satu item obat');
+            return;
+        }
         data = data.map(function(e) {
             return {
                 name: e[0],
                 quantity: parseInt(e[1]),
                 unit: e[2],
-                piece_price: parseFloat(e[3]) / e[1],
-                price: parseFloat(e[3]),
+                piece_price: parseFloat(e[3]),
+                price: parseFloat(e[3]) * parseInt(e[1]),
                 expired: e[4]
             };
         });
-        document.querySelector("input[name='total']").value = total
-        document.querySelector("input[name='transaction']").value = JSON.stringify(data)
-        // console.log(document.querySelector("input[name='transaction']").value);
-        showModal(method, form)
+        document.querySelector("input[name='total']").value = total;
+        document.querySelector("input[name='transaction']").value = JSON.stringify(data);
+        showDestinationModal();
     }
+
+    function showDestinationModal() {
+        document.getElementById('destinationModal').classList.remove('hidden');
+    }
+
+    function closeDestinationModal() {
+        document.getElementById('destinationModal').classList.add('hidden');
+    }
+
+    function selectDestination(destination) {
+        document.querySelector("input[name='destination']").value = destination;
+        closeDestinationModal();
+        showModal('add', 'add-stuff-form');
+    }
+
+    document.getElementById('import-inventory-form').addEventListener('submit', function(e) {
+        e.preventDefault();
+        const form = e.target;
+        const fileInput = form.querySelector('input[name="file"]');
+        if (!fileInput.files.length) {
+            showToastError('Silakan pilih file terlebih dahulu');
+            return;
+        }
+        const formData = new FormData(form);
+        fetch(form.action, {
+            method: 'POST',
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest',
+                'X-CSRF-TOKEN': form.querySelector('input[name="_token"]').value
+            },
+            body: formData
+        })
+        .then(async response => {
+            if (!response.ok) {
+                const data = await response.json();
+                throw new Error(data.error || 'Gagal mengimpor data');
+            }
+            return response.json();
+        })
+        .then(result => {
+            if (result.data && Array.isArray(result.data)) {
+                result.data.forEach(row => {
+                    const namaObat = row.nama_obat || row.name || '';
+                    const jumlah = row.jumlah || row.quantity || '';
+                    const satuan = row.satuan || row.unit || '';
+                    const hargaSatuan = row.harga_satuan || row.price || '';
+                    const tanggalExp = row.tanggal_exp || row.expired || '';
+                    const existingIndex = data.findIndex(item => 
+                        item[0] === namaObat && item[4] === tanggalExp
+                    );
+                    if (existingIndex !== -1) {
+                        data[existingIndex][1] = (parseInt(data[existingIndex][1]) + parseInt(jumlah)).toString();
+                        data[existingIndex][3] = (parseFloat(data[existingIndex][3]) + parseFloat(hargaSatuan)).toString();
+                    } else {
+                        data.push([namaObat, jumlah, satuan, hargaSatuan, tanggalExp]);
+                    }
+                });
+                draw();
+                closeUploadModal();
+                showToastSuccess('Berhasil mengimpor data dari Excel!');
+            } else {
+                showToastError('Format data tidak valid.');
+            }
+        })
+        .catch(error => {
+            showToastError(error.message || 'Gagal mengimpor data');
+        });
+    });
 </script>
 @endsection

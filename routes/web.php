@@ -26,6 +26,7 @@ use Maatwebsite\Excel\Facades\Excel;
 // menambahkan pdf
 use App\Http\Controllers\PdfInventoryController;
 use App\Http\Controllers\PDFKlinikController;
+use App\Http\Controllers\PdfCheckoutController;
 
 // menambahkan template
 use App\Exports\InventoryTemplateExport;
@@ -141,6 +142,8 @@ Route::middleware('auth')->group(function () {
                 Route::get("{bill}", "bill")->name("show");
                 Route::get("{bill}/print", "billPrint")->name("print");
                 Route::post("{bill}/pay", "billPay")->name("pay");
+                Route::get("{bill}/export/excel", "exportBillExcel")->name("export.excel");
+                Route::get("{bill}/export/pdf", "exportBillPdf")->name("export.pdf");
             });
             Route::prefix("retur")->as("retur.")->group(function () {
                 Route::get("/", "returs")->name("index");
@@ -164,6 +167,10 @@ Route::middleware('auth')->group(function () {
     // menambahakan pdf
     Route::get('/clinic/generate-pdf/{transaction_id}', [PDFKlinikController::class, 'generatePdf']);
 
+    // Export routes  checkout
+    Route::get('/checkout/export/{transaction_id}', [TransactionController::class, 'exportCheckout'])->name('checkout.export');
+    Route::get('/checkout/generate-pdf/{transaction_id}', [PdfCheckoutController::class, 'generatePdf'])->name('checkout.generate-pdf');
+
     // menambahakan tempalte inventory
 
     Route::get('/export-template', function () {
@@ -178,9 +185,7 @@ Route::middleware('auth')->group(function () {
     Route::get('/export-excel/{transaction_id?}', [ReportController::class, 'exportExcel']);
 
     // route pdfreport
-    Route::get('/export-pdf', function () {
-        return (new ReportController())->generate();
-    });
+    Route::get('/export-pdf', [ReportController::class, 'generate']);
 
     //Route exceldetailreport
     Route::get('/drug/{id}/export', [ReportController::class, 'exportExcelDetail'])->name('drug.export');

@@ -20,6 +20,9 @@ class InventoryUploadController extends Controller
 
         // Cek jika file tidak ada
         if (!$request->hasFile('file')) {
+            if ($request->ajax()) {
+                return response()->json(['error' => 'Tidak ada file yang diunggah.'], 422);
+            }
             return back()->with('error', 'Tidak ada file yang diunggah.');
         }
 
@@ -34,23 +37,31 @@ class InventoryUploadController extends Controller
             Excel::import(new InventoryUpload, $file);
             $importedData = Session::get('imported_data');
 
-            // Debug: Periksa struktur data yang diimpor
-            // dd($importedData);
-
             // Cek jika data kosong
             if (empty($importedData) || (is_object($importedData) && $importedData->isEmpty())) {
+                if ($request->ajax()) {
+                    return response()->json(['error' => 'Tidak ada data valid yang berhasil diimpor.'], 422);
+                }
                 return back()->with('warning', 'Tidak ada data valid yang berhasil diimpor.');
             }
 
-            // Ambil data dari database
-            $vendors = Vendor::all();
             $drugs = Drug::all();
             $judul = "Tambah Barang";
 
-            // Kirim ke view dengan data hasil import
-            return view("pages.inventory.addStuff", compact('vendors', 'drugs', 'judul', 'importedData'));
+            $processedData = $importedData;
+            Session::put('imported_data', $processedData);
+            Session::save();
+
+            if ($request->ajax()) {
+                return response()->json(['data' => $processedData->values()]);
+            }
+
+            return view("pages.inventory.addStuff", compact('drugs', 'judul', 'importedData'));
 
         } catch (\Exception $e) {
+            if ($request->ajax()) {
+                return response()->json(['error' => 'Terjadi kesalahan saat mengimpor data: ' . $e->getMessage()], 500);
+            }
             // Tangkap error dan tampilkan pesan
             return back()->with('error', 'Terjadi kesalahan saat mengimpor data: ' . $e->getMessage());
         }

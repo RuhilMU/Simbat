@@ -34,9 +34,11 @@ class DrugController extends Controller
     public function getRepacks(Request $request)
     {
         $query = $request->input('query');
+        $source = $request->input('source', 'warehouse');
+        
         $drugs = Repack::where('name', 'like', "%{$query}%")->get();
-        $drugs = $drugs->map(function ($drug) {
-            $drug->stock = $drug->stock();
+        $drugs = $drugs->map(function ($drug) use ($source) {
+            $drug->stock = $source === 'clinic' ? $drug->clinic_stock() : $drug->stock();
             $drug->drug = $drug->drug();
             return $drug;
         });
@@ -64,11 +66,50 @@ class DrugController extends Controller
             $category = Category::find($request->category_id);
             //membuat kode untuk obat yang dibuat
             $request["code"] = $this->generateCode($category);
-            $drug = Drug::create($request->all());
+            
+            $validate = $request->validate([
+                'category_id' => 'required|exists:categories,id',
+                'variant_id' => 'required|exists:variants,id',
+                'manufacture_id' => 'required|exists:manufactures,id',
+                'name' => 'required|string|min:3|max:255|unique:drugs,name',
+                'code' => 'unique:drugs,code',
+                'last_price' => 'nullable|integer|min:0',
+                'last_discount' => 'nullable|integer|min:0',
+                'maximum_capacity' => 'required|integer|min:1',
+                'minimum_capacity' => 'required|integer|min:0',
+                'pack_quantity' => 'required|integer|min:1',
+                'pack_margin' => 'required|integer|min:0',
+                'piece_quantity' => 'required|integer|min:1',
+                'piece_margin' => 'required|integer|min:0',
+                'piece_netto' => 'required|integer|min:1',
+                'piece_unit' => 'required|in:ml,mg,butir'
+            ], [
+                'name.unique' => 'Nama obat sudah ada',
+                'code.unique' => 'Kode obat sudah ada'
+            ]);
+            
+            $drug = Drug::create($validate);
             //membuat repack dan stok default untuk obat yang dibuat
             $drug->default_repacks();
             $drug->default_stock();
             return redirect()->route('master.drug.edit', $drug->id)->with('success', 'Obat berhasil dibuat');
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            $allErrors = $e->errors();
+            $allAreDuplicates = true;
+            
+            foreach ($allErrors as $field => $errors) {
+                foreach ($errors as $error) {
+                    if ($error !== 'Nama obat sudah ada' && $error !== 'Kode obat sudah ada') {
+                        $allAreDuplicates = false;
+                        break 2;
+                    }
+                }
+            }
+            
+            if ($allAreDuplicates) {
+                return back()->withErrors($e->errors())->withInput();
+            }
+            return back()->with('error', 'Obat gagal dibuat')->withInput();
         } catch (\Throwable $th) {
             return redirect()->back()->with('error', 'Obat gagal dibuat');
         }
@@ -84,37 +125,110 @@ class DrugController extends Controller
     }
     public function update(Request $request, Drug $drug)
     {
-        $drug->update($request->all());
-        $repacks = $drug->repacks();
-        //melakukan update data harga terhadap semua data repack
-        foreach ($repacks as $item) {
-            $item->update_price();
+        try {
+            $validate = $request->validate([
+                'category_id' => 'required|exists:categories,id',
+                'variant_id' => 'required|exists:variants,id',
+                'manufacture_id' => 'required|exists:manufactures,id',
+                'name' => 'required|string|min:3|max:255|unique:drugs,name,' . $drug->id,
+                'code' => 'unique:drugs,code,' . $drug->id,
+                'last_price' => 'nullable|integer|min:0',
+                'last_discount' => 'nullable|integer|min:0',
+                'maximum_capacity' => 'required|integer|min:1',
+                'minimum_capacity' => 'required|integer|min:0',
+                'pack_quantity' => 'required|integer|min:1',
+                'pack_margin' => 'required|integer|min:0',
+                'piece_quantity' => 'required|integer|min:1',
+                'piece_margin' => 'required|integer|min:0',
+                'piece_netto' => 'required|integer|min:1',
+                'piece_unit' => 'required|in:ml,mg,butir'
+            ], [
+                'name.unique' => 'Nama obat sudah ada',
+                'code.unique' => 'Kode obat sudah ada'
+            ]);
+            
+            $drug->update($validate);
+            $repacks = $drug->repacks();
+            //melakukan update data harga terhadap semua data repack
+            foreach ($repacks as $item) {
+                $item->update_price();
+            }
+            return redirect()->back()->with('success', 'Berhasil mengubah data obat');
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            $allErrors = $e->errors();
+            $allAreDuplicates = true;
+            
+            foreach ($allErrors as $field => $errors) {
+                foreach ($errors as $error) {
+                    if ($error !== 'Nama obat sudah ada' && $error !== 'Kode obat sudah ada') {
+                        $allAreDuplicates = false;
+                        break 2;
+                    }
+                }
+            }
+            
+            if ($allAreDuplicates) {
+                return back()->withErrors($e->errors())->withInput();
+            }
+            return back()->with('error', 'Gagal mengubah data obat')->withInput();
+        } catch (\Throwable $e) {
+            return redirect()->back()->with('error', 'Gagal mengubah data obat');
         }
-        return redirect()->back()->with('success', 'Berhasil mengubah data obat');
     }
-    public function repack(Request $request, Drug $drug, Repack $repack)
+    public function repack(Request $request, Drug $drug, Repack $repack = null)
     {
         if ($request->isMethod('DELETE')) {
-            //melakukan pengecekan apakah repack adalah repack default (1 pack dan 1pcs)
-            if ($repack->quantity != $drug->piece_quantity * $drug->piece_netto && $repack->quantity != $drug->piece_netto) {
-                $repack->delete();
-                return back()->with('success', 'Berhasil menghapus repack');
+            try {
+                //melakukan pengecekan apakah repack adalah repack default (1 pack dan 1pcs)
+                if ($repack->quantity != $drug->piece_quantity * $drug->piece_netto && $repack->quantity != $drug->piece_netto) {
+                    if ($repack->stock() > 0 || $repack->clinic_stock() > 0) {
+                        return back()->with('error', 'Tidak dapat menghapus repack yang masih memiliki stok');
+                    }
+                    $repack->delete();
+                    return back()->with('success', 'Berhasil menghapus repack');
+                }
+                return back()->with('error', 'Tidak dapat menghapus repack default');
+            } catch (\Throwable $e) {
+                return back()->with('error', 'Gagal menghapus repack');
             }
-            return back()->with('error', 'Gagal menghapus repack');
         } else {
-            $quantity = $request->quantity;
-            if ($request->piece_unit == "pcs") {
-                $quantity = $request->quantity * $drug->piece_netto;
+            try {
+                $validate = $request->validate([
+                    'quantity' => 'required|numeric|min:1',
+                    'piece_unit' => 'required|in:pack,pcs',
+                    'margin' => 'required|numeric|min:0'
+                ]);
+
+                if ($drug->last_price == 0) {
+                    return back()->with('error', 'Tidak dapat membuat repack: Obat belum memiliki harga')->withInput();
+                }
+
+                $quantity = $request->quantity;
+                if ($request->piece_unit == "pcs") {
+                    $quantity = $request->quantity * $drug->piece_netto;
+                }
+
+                $existingRepack = Repack::where('drug_id', $drug->id)
+                    ->where('quantity', $quantity)
+                    ->first();
+                
+                if ($existingRepack) {
+                    return back()->with('error', 'Repack dengan jumlah tersebut sudah ada')->withInput();
+                }
+
+                Repack::create([
+                    "drug_id" => $drug->id,
+                    "name" => $drug->name . " " . $request->quantity . " " . $request->piece_unit,
+                    "quantity" => $quantity,
+                    "margin" => $request->margin,
+                    "price" => $drug->calculate_price($quantity, $request->margin)
+                ]);
+                return back()->with('success', 'Berhasil membuat repack');
+            } catch (\Illuminate\Validation\ValidationException $e) {
+                return back()->with('error', 'Gagal membuat repack')->withInput();
+            } catch (\Throwable $e) {
+                return back()->with('error', 'Gagal membuat repack')->withInput();
             }
-            // dd($quantity);
-            Repack::create([
-                "drug_id" => $drug->id,
-                "name" => $drug->name . " " . $request->quantity . " " . $request->piece_unit,
-                "quantity" => $quantity,
-                "margin" => $request->margin,
-                "price" => $drug->calculate_price($quantity, $request->margin)
-            ]);
-            return back()->with('success', 'Berhasil membuat repack');
         }
     }
     public function destroy(Drug $drug)

@@ -13,6 +13,7 @@ use App\Http\Controllers\Api\V1\InventoryController;
 use App\Http\Controllers\Api\V1\ReportController;
 use App\Http\Controllers\Api\V1\ManagementController;
 use App\Http\Controllers\Api\V1\CheckoutController;
+use App\Http\Controllers\Api\V1\TransactionController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -42,7 +43,7 @@ Route::prefix('v1')->group(function () {
 
         // User management routes
         Route::apiResource('users', UserController::class);
-        Route::post('/profile', [UserController::class, 'updateProfile']);
+        Route::put('/profile', [UserController::class, 'updateProfile']);
 
         // Master data routes
         Route::apiResource('categories', CategoryController::class);
@@ -85,6 +86,11 @@ Route::prefix('v1')->group(function () {
             Route::get('/inflows/{id}', [InventoryController::class, 'getInflowDetail']);
             Route::post('/inflows', [InventoryController::class, 'createInflow']);
 
+            // Clinic Inflows
+            Route::get('/clinic-inflows', [InventoryController::class, 'getClinicInflows']);
+            Route::get('/clinic-inflows/{id}', [InventoryController::class, 'getClinicInflowDetail']);
+            Route::post('/clinic-inflows', [InventoryController::class, 'createClinicInflow']);
+
             // Vendors & Drugs
             Route::get('/vendors', [InventoryController::class, 'getVendors']);
             Route::get('/drugs', [InventoryController::class, 'getDrugs']);
@@ -95,15 +101,16 @@ Route::prefix('v1')->group(function () {
             Route::get('/stocks/search', [InventoryController::class, 'searchStocks']);
 
             // Clinic Stocks
-            Route::get('/clinic/stocks', [InventoryController::class, 'getClinicStocks']);
-            Route::get('/clinic/stocks/{id}', [InventoryController::class, 'getClinicStockDetail']);
-            Route::get('/clinic/stocks/search', [InventoryController::class, 'searchClinicStocks']);
-            Route::post('/clinic/transfer', [InventoryController::class, 'transferToClinic']);
+            Route::get('/clinic-stocks', [InventoryController::class, 'getClinicStocks']);
+            Route::get('/clinic-stocks/{id}', [InventoryController::class, 'getClinicStockDetail']);
+            Route::get('/clinic-stocks/search', [InventoryController::class, 'searchClinicStocks']);
+            Route::post('/transfer-to-clinic', [InventoryController::class, 'transferToClinic']);
         });
 
         // Management routes
         Route::prefix('management')->group(function () {
             // Bills
+            Route::get('/search', [ManagementController::class, 'searchManagement']);
             Route::get('/bills', [ManagementController::class, 'getBills']);
             Route::get('/bills/{id}', [ManagementController::class, 'getBillDetail']);
             Route::post('/bills/{id}/pay', [ManagementController::class, 'payBill']);
@@ -133,6 +140,11 @@ Route::prefix('v1')->group(function () {
             Route::get('/drugs', [CheckoutController::class, 'getAvailableDrugs']);
             Route::post('/', [CheckoutController::class, 'checkout']);
             Route::get('/history', [CheckoutController::class, 'history']);
+        });
+
+        // Transaction routes
+        Route::prefix('transactions')->group(function () {
+            Route::get('/top-selling', [TransactionController::class, 'topSelling']);
         });
     });
 });

@@ -37,9 +37,9 @@
                 </thead>
                 <tbody id="bill-value"></tbody>
                 <tbody id="bill-data" class="text-gray-700">
-                    @foreach ($bills as $number => $item)
+                    @foreach ($bills as $item)
                         <tr class="border-b border-gray-200 hover:bg-gray-100">
-                            <td class="py-3">{{ $number + 1 }}</td>
+                            <td class="py-3">{{ $loop->iteration + ($bills->currentPage() - 1) * $bills->perPage() }}</td>
                             <td>{{ $item->transaction()->code }}</td>
                             <td>{{ Carbon::parse($item->created_at)->translatedFormat('j F Y') }}</td>
                             <td>{{ Carbon::parse($item->due)->translatedFormat('j F Y') }}</td>

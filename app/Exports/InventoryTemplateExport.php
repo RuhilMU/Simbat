@@ -18,7 +18,7 @@ class InventoryTemplateExport implements FromArray, WithHeadings, WithEvents
 
     public function headings(): array
     {
-        return ["Vendor", "Jenis Pembayaran", "Tanggal Pembayaran", "Nama Obat", "Jumlah", "Satuan", "Harga Satuan", "Tanggal EXP"];
+        return ["Nama Obat", "Jumlah", "Satuan", "Harga Satuan", "Tanggal EXP"];
     }
 
     public function registerEvents(): array
@@ -26,12 +26,6 @@ class InventoryTemplateExport implements FromArray, WithHeadings, WithEvents
         return [
             AfterSheet::class => function (AfterSheet $event) {
                 $sheet = $event->sheet->getDelegate();
-
-                // Ambil daftar vendor dari database
-                $vendors = Vendor::pluck('name')->toArray();
-
-                // Daftar pilihan manual untuk "Jenis Pembayaran"
-                $jenisPembayaran = ['Bayar Langsung', 'Bayar Tempo'];
 
                 // Ambil daftar "Nama Obat" dan harga dari database
                 $drugs = Drug::pluck('last_price', 'name')->toArray(); // Key: Nama Obat, Value: Harga
@@ -48,7 +42,7 @@ class InventoryTemplateExport implements FromArray, WithHeadings, WithEvents
                             $validation = $sheet->getCell($column . $row)->getDataValidation();
                             $validation->setType(\PhpOffice\PhpSpreadsheet\Cell\DataValidation::TYPE_LIST);
                             $validation->setErrorStyle(\PhpOffice\PhpSpreadsheet\Cell\DataValidation::STYLE_INFORMATION);
-                            $validation->setAllowBlank(true); // Ubah menjadi true untuk memungkinkan sel kosong
+                            $validation->setAllowBlank(true);
                             $validation->setShowInputMessage(true);
                             $validation->setShowErrorMessage(true);
                             $validation->setShowDropDown(true);
@@ -58,28 +52,24 @@ class InventoryTemplateExport implements FromArray, WithHeadings, WithEvents
                 }
 
                 // Terapkan dropdown ke masing-masing kolom
-                setDropdown($sheet, 'A', $vendors); // Kolom Vendor
-                setDropdown($sheet, 'B', $jenisPembayaran); // Kolom Jenis Pembayaran
-                setDropdown($sheet, 'D', array_keys($drugs)); // Kolom Nama Obat
-                setDropdown($sheet, 'F', $satuan); // Kolom Satuan
+                setDropdown($sheet, 'A', array_keys($drugs)); // Kolom Nama Obat
+                setDropdown($sheet, 'C', $satuan); // Kolom Satuan
 
-                // Terapkan format tanggal dan tambahkan date picker di kolom "Tanggal Pembayaran" (C) dan "Tanggal EXP" (H)
+                // Terapkan format tanggal dan tambahkan date picker di kolom "Tanggal EXP" (E)
                 for ($row = 2; $row <= 100; $row++) {
-                    $sheet->getStyle("C$row")->getNumberFormat()->setFormatCode('yyyy-mm-dd');
-                    $sheet->getStyle("H$row")->getNumberFormat()->setFormatCode('yyyy-mm-dd');
+                    $sheet->getStyle("E$row")->getNumberFormat()->setFormatCode('yyyy-mm-dd');
 
-                    $dateValidation = $sheet->getCell("C$row")->getDataValidation();
+                    $dateValidation = $sheet->getCell("E$row")->getDataValidation();
                     $dateValidation->setType(\PhpOffice\PhpSpreadsheet\Cell\DataValidation::TYPE_DATE);
                     $dateValidation->setErrorStyle(\PhpOffice\PhpSpreadsheet\Cell\DataValidation::STYLE_STOP);
-                    $dateValidation->setAllowBlank(true); // Ubah menjadi true
+                    $dateValidation->setAllowBlank(true);
                     $dateValidation->setShowInputMessage(true);
                     $dateValidation->setShowErrorMessage(true);
-                    $dateValidation->setFormula1('DATE(1900,1,1)'); // Gunakan fungsi DATE untuk tanggal minimum
-                    $dateValidation->setFormula2('DATE(2099,12,31)'); // Gunakan fungsi DATE untuk tanggal maksimum
+                    $dateValidation->setFormula1('DATE(1900,1,1)');
+                    $dateValidation->setFormula2('DATE(2099,12,31)');
                     $dateValidation->setOperator(\PhpOffice\PhpSpreadsheet\Cell\DataValidation::OPERATOR_BETWEEN);
 
-                    $sheet->getCell("C$row")->setDataValidation(clone $dateValidation);
-                    $sheet->getCell("H$row")->setDataValidation(clone $dateValidation);
+                    $sheet->getCell("E$row")->setDataValidation(clone $dateValidation);
                 }
 
                 // *** Langkah untuk Menghubungkan Nama Obat dengan Harga Satuan ***
@@ -111,8 +101,8 @@ class InventoryTemplateExport implements FromArray, WithHeadings, WithEvents
 
                 // 2. Gunakan VLOOKUP untuk mengambil harga berdasarkan obat yang dipilih (tanpa mengalikan dengan jumlah)
                 for ($row = 2; $row <= 100; $row++) {
-                    $formula = "=IF(D$row<>\"\",VLOOKUP(D$row,'Data Harga Obat'!A:B,2,FALSE),\"\")";
-                    $sheet->getCell("G$row")->setValue($formula);
+                    $formula = "=IF(A$row<>\"\",VLOOKUP(A$row,'Data Harga Obat'!A:B,2,FALSE),\"\")";
+                    $sheet->getCell("D$row")->setValue($formula);
                 }
 
                 // Sembunyikan sheet data harga obat

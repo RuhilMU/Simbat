@@ -45,9 +45,17 @@
                             <td class="py-2">Produsen</td>
                             <td class="py-2">{{ $drug->manufacture()->name }}</td>
                         </tr>
-                        <tr>
+                        <tr class="border-b">
                             <td class="py-2">Sisa</td>
-                            <td class="py-2">{{ $stock->quantity / $drug->piece_netto }} pcs</td>
+                            <td class="py-2">
+                                {{ floor($totalStock / $drug->piece_netto) }} pcs
+                                @if($warehouseStock && $warehouseStock->quantity >= 0)
+                                    <br><span class="text-sm text-gray-600">(Gudang: {{ floor($warehouseStock->quantity / $drug->piece_netto) }} pcs)</span>
+                                @endif
+                                @if($clinicStock && $clinicStock->quantity >= 0)
+                                    <br><span class="text-sm text-gray-600">(Klinik: {{ floor($clinicStock->quantity / $drug->piece_netto) }} pcs)</span>
+                                @endif
+                            </td>
                         </tr>
                     </tbody>
                 </table>
@@ -72,7 +80,7 @@
                             <td class="py-3 px-6">{{ $number + 1 }}</td>
                             <td class="py-3 px-6 text-left">{{ $item->name }}</td>
                             <td class="py-3 px-6">{{ $item->margin }}%</td>
-                            <td class="py-3 px-6">{{ floor($stock->quantity / $item->quantity) }}</td>
+                            <td class="py-3 px-6">{{ floor($totalStock / $item->quantity) }}</td>
                             <td class="py-3 px-6">{{ 'Rp ' . number_format($item->price, 0, ',', '.') }}</td>
                         </tr>
                     @endforeach
@@ -129,14 +137,22 @@
         </div>
         <h2 class="text-xl font-semibold my-6">HISTORI TRANSAKSI</h2>
         <div class="flex items-center justify-between w-full my-6 mt-8">
-            <form action="" class="flex w-auto flex-row justify-between gap-3 ">
-                <input class="rounded-sm px-2 py-1 ring-2 ring-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500" type="date" name="" id="" />
+            <form action="" method="GET" class="flex w-auto flex-row justify-between gap-3">
+                <input class="rounded-sm px-2 py-1 ring-2 ring-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500" 
+                    type="date" name="start" value="{{ request('start') }}" />
                 <h1 class="text-lg font-inter text-gray-800">sampai</h1>
-                <input class="rounded-sm px-2 py-1 ring-2 ring-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500" type="date" name="" id="" />
+                <input class="rounded-sm px-2 py-1 ring-2 ring-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    type="date" name="end" value="{{ request('end') }}" />
                 <button class="rounded-2xl bg-blue-500 px-3 font-bold text-sm font-inter text-white hover:bg-blue-600"
                     type="submit">
                     TERAPKAN
                 </button>
+                @if(request('start') || request('end'))
+                    <a href="{{ route('report.drugs.show', $drug->id) }}" 
+                        class="rounded-2xl bg-gray-500 px-3 font-bold text-sm font-inter text-white hover:bg-gray-600">
+                        RESET
+                    </a>
+                @endif
             </form>
         </div>
         <div class="bg-white shadow-md rounded-lg overflow-hidden">

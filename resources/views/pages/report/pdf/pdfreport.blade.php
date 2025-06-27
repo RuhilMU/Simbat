@@ -9,10 +9,18 @@
         table { width: 100%; border-collapse: collapse; margin-top: 20px; }
         th, td { border: 1px solid #000; padding: 8px; text-align: left; }
         th { background-color: #f2f2f2; }
+        .date-range { text-align: center; margin: 10px 0; font-weight: bold; }
     </style>
 </head>
 <body>
     <h2 style="text-align: center;">Laporan Stok Obat</h2>
+    
+    @if(isset($startDate) && isset($endDate))
+        <div class="date-range">
+            Periode Expired: {{ \Carbon\Carbon::parse($startDate)->translatedFormat('j F Y') }} - {{ \Carbon\Carbon::parse($endDate)->translatedFormat('j F Y') }}
+        </div>
+    @endif
+    
     <table>
         <thead>
             <tr>
@@ -25,14 +33,14 @@
             </tr>
         </thead>
         <tbody>
-            @foreach ($warehouses as $index => $item)
+            @foreach ($stocks as $index => $item)
             <tr>
                 <td>{{ $index + 1 }}</td>
-                <td>{{ $item->data->code }}</td>
-                <td>{{ $item->data->name }}</td>
-                <td>{{ floor($item->quantity / $item->data->piece_netto) }} pcs</td>
-                <td>{{ \Carbon\Carbon::parse($item->oldest)->translatedFormat('j F Y') }}</td>
-                <td>{{ \Carbon\Carbon::parse($item->latest)->translatedFormat('j F Y') }}</td>
+                <td>{{ $item->drug->code }}</td>
+                <td>{{ $item->drug->name }}</td>
+                <td>{{ floor($item->quantity / $item->drug->piece_netto) }} pcs</td>
+                <td>{{ $item->oldest ? \Carbon\Carbon::parse($item->oldest)->translatedFormat('j F Y') : '-' }}</td>
+                <td>{{ $item->latest ? \Carbon\Carbon::parse($item->latest)->translatedFormat('j F Y') : '-' }}</td>
             </tr>
             @endforeach
         </tbody>

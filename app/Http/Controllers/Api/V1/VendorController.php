@@ -20,6 +20,7 @@ class VendorController extends ApiController
      *     path="/api/v1/vendors",
      *     summary="Get all vendors",
      *     tags={"Vendors"},
+     *     security={{"bearerAuth":{}}},
      *     @OA\Parameter(
      *         name="search",
      *         in="query",
@@ -75,6 +76,7 @@ class VendorController extends ApiController
      *     path="/api/v1/vendors",
      *     summary="Create a new vendor",
      *     tags={"Vendors"},
+     *     security={{"bearerAuth":{}}},
      *     @OA\RequestBody(
      *         required=true,
      *         @OA\JsonContent(
@@ -137,9 +139,6 @@ class VendorController extends ApiController
                 'address' => $request->address
             ]);
             
-            // Load relationships manually
-            $vendor->drugs = $vendor->drugs();
-
             return $this->successResponse($vendor, 'Vendor created successfully', 201);
         } catch (\Exception $e) {
             return $this->errorResponse('Failed to create vendor: ' . $e->getMessage(), [], 500);
@@ -151,6 +150,7 @@ class VendorController extends ApiController
      *     path="/api/v1/vendors/{vendor}",
      *     summary="Get vendor details",
      *     tags={"Vendors"},
+     *     security={{"bearerAuth":{}}},
      *     @OA\Parameter(
      *         name="vendor",
      *         in="path",
@@ -181,9 +181,6 @@ class VendorController extends ApiController
      */
     public function show(Vendor $vendor)
     {
-        // Load relationships manually
-        $vendor->drugs = $vendor->drugs();
-
         return $this->successResponse($vendor, 'Vendor retrieved successfully');
     }
 
@@ -192,6 +189,7 @@ class VendorController extends ApiController
      *     path="/api/v1/vendors/{vendor}",
      *     summary="Update vendor details",
      *     tags={"Vendors"},
+     *     security={{"bearerAuth":{}}},
      *     @OA\Parameter(
      *         name="vendor",
      *         in="path",
@@ -260,9 +258,6 @@ class VendorController extends ApiController
 
         try {
             $vendor->update($request->all());
-            
-            // Load relationships manually
-            $vendor->drugs = $vendor->drugs();
 
             return $this->successResponse($vendor, 'Vendor updated successfully');
         } catch (\Exception $e) {
@@ -275,6 +270,7 @@ class VendorController extends ApiController
      *     path="/api/v1/vendors/{vendor}",
      *     summary="Delete a vendor",
      *     tags={"Vendors"},
+     *     security={{"bearerAuth":{}}},
      *     @OA\Parameter(
      *         name="vendor",
      *         in="path",
@@ -321,8 +317,8 @@ class VendorController extends ApiController
     public function destroy(Vendor $vendor)
     {
         try {
-            // Check if vendor has any drugs
-            if (count($vendor->drugs()) > 0) {
+            // Check if vendor has any drugs using the relationship directly
+            if ($vendor->drugs && $vendor->drugs->count() > 0) {
                 return $this->errorResponse('Cannot delete vendor with existing drugs', [], 422);
             }
 
@@ -335,44 +331,5 @@ class VendorController extends ApiController
         } catch (\Exception $e) {
             return $this->errorResponse('Failed to delete vendor: ' . $e->getMessage(), [], 500);
         }
-    }
-
-    /**
-     * @OA\Get(
-     *     path="/api/v1/vendors/search",
-     *     summary="Search vendors",
-     *     tags={"Vendors"},
-     *     @OA\Parameter(
-     *         name="query",
-     *         in="query",
-     *         required=true,
-     *         description="Search query for vendor name, phone, or address",
-     *         @OA\Schema(type="string")
-     *     ),
-     *     @OA\Response(
-     *         response=200,
-     *         description="Vendors search results",
-     *         @OA\JsonContent(
-     *             @OA\Property(property="status", type="string", example="success"),
-     *             @OA\Property(property="message", type="string", example="Vendors search results"),
-     *             @OA\Property(property="data", type="array", @OA\Items(
-     *                 @OA\Property(property="id", type="integer", example=1),
-     *                 @OA\Property(property="name", type="string", example="Vendor Name"),
-     *                 @OA\Property(property="phone", type="string", example="081234567890"),
-     *                 @OA\Property(property="address", type="string", example="Vendor Address")
-     *             ))
-     *         )
-     *     )
-     * )
-     */
-    public function search(Request $request)
-    {
-        $query = $request->input('query');
-        $vendors = Vendor::where('name', 'like', "%{$query}%")
-                        ->orWhere('phone', 'like', "%{$query}%")
-                        ->orWhere('address', 'like', "%{$query}%")
-                        ->get();
-
-        return $this->successResponse($vendors, 'Vendors search results');
     }
 } 

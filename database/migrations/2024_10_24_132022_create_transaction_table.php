@@ -19,8 +19,8 @@ return new class extends Migration
         //banyak field yang nullable karena hanya diperlukan pada beberapa transaksi
         Schema::create('transactions', function (Blueprint $table) {
             $table->id();
-            $table->char('code',12)->nullable();
-            $table->foreignIdFor(Vendor::class)->nullable();
+            $table->char('code',13)->nullable();
+            $table->foreignIdFor(Vendor::class)->nullable()->constrained()->onDelete('restrict');
             $table->enum('destination',['customer','clinic','warehouse']);
             $table->enum('method',['credit','cash'])->nullable();
             $table->enum('variant',['LPB','LPK','Checkout','Trash','Retur'])->nullable();

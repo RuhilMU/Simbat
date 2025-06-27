@@ -305,46 +305,4 @@ class CategoryController extends ApiController
             return $this->errorResponse('Failed to delete category: ' . $e->getMessage(), [], 500);
         }
     }
-
-    /**
-     * @OA\Get(
-     *     path="/api/v1/categories/search",
-     *     summary="Search categories",
-     *     tags={"Categories"},
-     *     security={{"bearerAuth":{}}},
-     *     @OA\Parameter(
-     *         name="query",
-     *         in="query",
-     *         required=true,
-     *         description="Search query",
-     *         @OA\Schema(type="string")
-     *     ),
-     *     @OA\Response(
-     *         response=200,
-     *         description="Categories search results",
-     *         @OA\JsonContent(
-     *             @OA\Property(property="success", type="boolean", example=true),
-     *             @OA\Property(property="message", type="string", example="Categories search results"),
-     *             @OA\Property(
-     *                 property="data",
-     *                 type="array",
-     *                 @OA\Items(
-     *                     @OA\Property(property="id", type="integer"),
-     *                     @OA\Property(property="name", type="string"),
-     *                     @OA\Property(property="code", type="string")
-     *                 )
-     *             )
-     *         )
-     *     )
-     * )
-     */
-    public function search(Request $request)
-    {
-        $query = $request->input('query');
-        $categories = Category::where('name', 'like', "%{$query}%")
-                            ->orWhere('code', 'like', "%{$query}%")
-                            ->get();
-
-        return $this->successResponse($categories, 'Categories search results');
-    }
 } 

@@ -20,6 +20,7 @@ class RepackController extends ApiController
      * @OA\Get(
      *     path="/api/v1/repacks",
      *     tags={"Repacks"},
+     *     security={{"bearerAuth":{}}},
      *     summary="Get list of repacks",
      *     description="Returns a paginated list of drug repacks with optional search and filtering",
      *     @OA\Parameter(
@@ -99,6 +100,7 @@ class RepackController extends ApiController
      * @OA\Post(
      *     path="/api/v1/repacks",
      *     tags={"Repacks"},
+     *     security={{"bearerAuth":{}}},
      *     summary="Create a new repack",
      *     description="Creates a new drug repack with calculated price based on drug's base price and margin",
      *     @OA\RequestBody(
@@ -185,6 +187,7 @@ class RepackController extends ApiController
      * @OA\Get(
      *     path="/api/v1/repacks/{id}",
      *     tags={"Repacks"},
+     *     security={{"bearerAuth":{}}},
      *     summary="Get repack details",
      *     description="Returns detailed information about a specific repack",
      *     @OA\Parameter(
@@ -232,6 +235,7 @@ class RepackController extends ApiController
      * @OA\Put(
      *     path="/api/v1/repacks/{id}",
      *     tags={"Repacks"},
+     *     security={{"bearerAuth":{}}},
      *     summary="Update repack details",
      *     description="Updates the margin and recalculates the price of an existing repack",
      *     @OA\Parameter(
@@ -314,6 +318,7 @@ class RepackController extends ApiController
      * @OA\Delete(
      *     path="/api/v1/repacks/{id}",
      *     tags={"Repacks"},
+     *     security={{"bearerAuth":{}}},
      *     summary="Delete a repack",
      *     description="Deletes a repack if it is not a default repack and has no existing stock",
      *     @OA\Parameter(
@@ -374,55 +379,5 @@ class RepackController extends ApiController
         } catch (\Exception $e) {
             return $this->errorResponse('Failed to delete repack: ' . $e->getMessage(), [], 500);
         }
-    }
-
-    /**
-     * @OA\Get(
-     *     path="/api/v1/repacks/search",
-     *     tags={"Repacks"},
-     *     summary="Search repacks",
-     *     description="Search repacks by name",
-     *     @OA\Parameter(
-     *         name="query",
-     *         in="query",
-     *         description="Search query",
-     *         required=true,
-     *         @OA\Schema(type="string")
-     *     ),
-     *     @OA\Response(
-     *         response=200,
-     *         description="Successful operation",
-     *         @OA\JsonContent(
-     *             @OA\Property(property="success", type="boolean", example=true),
-     *             @OA\Property(property="message", type="string", example="Repacks search results"),
-     *             @OA\Property(
-     *                 property="data",
-     *                 type="array",
-     *                 @OA\Items(
-     *                     @OA\Property(property="id", type="integer"),
-     *                     @OA\Property(property="name", type="string"),
-     *                     @OA\Property(property="quantity", type="number"),
-     *                     @OA\Property(property="margin", type="number"),
-     *                     @OA\Property(property="price", type="number"),
-     *                     @OA\Property(property="drug", type="object"),
-     *                     @OA\Property(property="stock", type="object")
-     *                 )
-     *             )
-     *         )
-     *     )
-     * )
-     */
-    public function search(Request $request)
-    {
-        $query = $request->input('query');
-        $repacks = Repack::where('name', 'like', "%{$query}%")
-                        ->get()
-                        ->map(function ($repack) {
-                            $repack->stock = $repack->stock();
-                            $repack->drug = $repack->drug();
-                            return $repack;
-                        });
-
-        return $this->successResponse($repacks, 'Repacks search results');
     }
 } 

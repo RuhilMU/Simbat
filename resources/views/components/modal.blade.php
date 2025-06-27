@@ -86,7 +86,7 @@
     </div>
 </div>
 
-<div id="saveDrugModal" class="modal fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden">
+<!-- <div id="saveDrugModal" class="modal fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden">
     <div class="bg-white rounded-lg shadow-lg p-6 w-96 relative">
         <button type="button" class="absolute top-3 right-3 text-gray-400 hover:text-gray-600"
             onclick="closeModal()">
@@ -116,7 +116,7 @@
             </button>
         </div>
     </div>
-</div>
+</div> -->
 
 <script>
     let formData;

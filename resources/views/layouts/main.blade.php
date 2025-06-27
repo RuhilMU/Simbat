@@ -23,9 +23,9 @@
     @session('success')
         @include('components.toast_success')
     @endsession
-    @session('error')
+    @if(session('error') || $errors->any())
         @include('components.toast_error')
-    @endsession
+    @endif
 
 </body>
 

@@ -21,6 +21,14 @@ class Repack extends Model
         }
         return $warehouse->quantity / $this->quantity;
     }
+    //kalkulasi stok klinik berdasarkan konfigurasi repack
+    public function clinic_stock(){
+        $clinic = $this->drug()->clinic()->first();
+        if (!$clinic || $clinic->quantity == 0) {
+            return 0;
+        }
+        return $clinic->quantity / $this->quantity;
+    }
     //melakukan perubahan harga repack berdasarkan master data
     public function update_price(){
         $drug = $this->drug();

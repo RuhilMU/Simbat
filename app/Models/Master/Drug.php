@@ -110,25 +110,34 @@ class Drug extends Model
     }
 
     //melakukan pengurangan stok pada gudang berdasarkan expire terdekat
-    public function customerUseWarehouse(Transaction $transaction, int $require, int $repackQuantity,string $repackName,int $piecePrice,int $priceDiscount)
+    public function customerUseWarehouse(Transaction $transaction, int $require, int $repackQuantity, string $repackName, int $piecePrice, int $priceDiscount)
     {
-        $remain = $require;
+        $actualQuantity = str_contains($repackName, 'pack') ? 
+            $require * ($this->piece_quantity * $this->piece_netto) : 
+            $require * $this->piece_netto;
+        
+        $remain = $actualQuantity;
         $used = $this->used();
         $warehouse = $this->warehouse()->first();
-        $warehouse->quantity = $warehouse->quantity-$remain;
+        $warehouse->quantity = $warehouse->quantity - $actualQuantity;
         $warehouse->save();
+
+        $unit = str_contains($repackName, 'pack') ? 'pack' : 'pcs';
+        
         TransactionDetail::create([
-            "transaction_id"=>$transaction->id,
-            "drug_id"=>$this->id,
-            "expired"=>$this->warehouse()->first()->oldest,
-            "name"=>$repackName,
-            "quantity"=>$require/$repackQuantity,
-            "piece_price"=>$piecePrice,
-            "total_price"=>$piecePrice*($require/$repackQuantity),
-            "discount_price"=>$priceDiscount,
+            "transaction_id" => $transaction->id,
+            "drug_id" => $this->id,
+            "expired" => $this->warehouse()->first()->oldest,
+            "name" => $repackName,
+            "quantity" => $require . ' ' . $unit,
+            "piece_price" => $piecePrice,
+            "total_price" => $piecePrice * $require,
+            "discount_price" => $priceDiscount,
+            "flow" => -$actualQuantity
         ]);
-        if ($used->stock > $require) {
-            $used->stock = $used->stock - $require;
+
+        if ($used->stock > $actualQuantity) {
+            $used->stock = $used->stock - $actualQuantity;
             $used->save();
         } else {
             while ($remain > 0) {
@@ -147,6 +156,72 @@ class Drug extends Model
             }
         }
     }
+
+    public function customerUseClinic(Transaction $transaction, int $require, int $repackQuantity, string $repackName, int $piecePrice, int $priceDiscount)
+    {
+        \Log::info('Stock reduction values:', [
+            'drug_name' => $this->name,
+            'require' => $require,
+            'repack_quantity' => $repackQuantity,
+            'repack_name' => $repackName,
+            'is_pack' => str_contains($repackName, 'pack'),
+            'piece_quantity' => $this->piece_quantity,
+            'piece_netto' => $this->piece_netto,
+            'actual_quantity' => str_contains($repackName, 'pack') ? 
+                $require * ($this->piece_quantity * $this->piece_netto) : 
+                $require * $this->piece_netto
+        ]);
+
+        $actualQuantity = str_contains($repackName, 'pack') ? 
+            $require * ($this->piece_quantity * $this->piece_netto) : 
+            $require * $this->piece_netto;
+        
+        $remain = $actualQuantity;
+        $used = $this->used();
+        $clinic = $this->clinic()->first();
+        
+        if ($clinic->quantity < $actualQuantity) {
+            throw new \Exception("Insufficient stock in clinic for {$this->name}");
+        }
+        
+        $clinic->quantity = $clinic->quantity - $actualQuantity;
+        $clinic->save();
+        
+        $unit = str_contains($repackName, 'pack') ? 'pack' : 'pcs';
+        
+        TransactionDetail::create([
+            "transaction_id" => $transaction->id,
+            "drug_id" => $this->id,
+            "expired" => $clinic->oldest,
+            "name" => $repackName,
+            "quantity" => $require . ' ' . $unit,
+            "piece_price" => $piecePrice,
+            "total_price" => $piecePrice * $require,
+            "discount_price" => $priceDiscount,
+            "flow" => -$actualQuantity
+        ]);
+        
+        if ($used->stock > $actualQuantity) {
+            $used->stock = $used->stock - $actualQuantity;
+            $used->save();
+        } else {
+            while ($remain > 0) {
+                if ($used->stock > $remain) {
+                    $used->stock = $used->stock - $remain;
+                    $remain = 0;
+                    $used->save();
+                } else {
+                    $stockQuantity = $remain;
+                    $remain = $remain - $used->stock;
+                    $used->stock = 0;
+                    $used->save();
+                    $this->nextStock();
+                    $used = $this->used();
+                }
+            }
+        }
+    }
+
     //melakukan pemindahan stok yang digunakan berdasarkan expire date(khusus transaksi obat masuk klinik)
     public function clinicUseWarehouse(Transaction $transaction, int $require, int $repackQuantity)
     {

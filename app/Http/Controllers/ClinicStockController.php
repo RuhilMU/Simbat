@@ -34,9 +34,19 @@ class ClinicStockController extends Controller
         $drug = $stock;
         //mengambil data stok obat klinik
         $stock = Clinic::where('drug_id',$drug->id)->first();
-        $inflow = Transaction::where('variant','LPK')->pluck('id');
-        $details = TransactionDetail::where('drug_id',$drug->id)->whereIn('transaction_id',$inflow)->whereNot('stock',0)->orderBy('expired')->paginate(10,['*'],'expired');
-        $transactions = TransactionDetail::where('drug_id',$drug->id)->whereIn('transaction_id',$inflow)->orderBy('created_at')->paginate(10,['*'],'transaction');
+        
+        $inflow = Transaction::where('destination', 'clinic')->whereIn('variant', ['LPK', 'Trash', 'Retur'])->pluck('id');
+        $details = TransactionDetail::where('drug_id',$drug->id)
+            ->whereIn('transaction_id',$inflow)
+            ->whereNot('stock',0)
+            ->selectRaw('MIN(id) as id, expired, SUM(stock) as stock, drug_id')
+            ->groupBy('expired', 'drug_id')
+            ->orderBy('expired')
+            ->paginate(10,['*'],'expired');
+        $transactions = TransactionDetail::where('drug_id',$drug->id)
+            ->whereIn('transaction_id',$inflow)
+            ->orderBy('created_at')
+            ->paginate(10,['*'],'transaction');
         return view("pages.clinic.stockDetail",compact('drug','stock','judul','details','transactions'));
     }
     public function retur(Request $request,TransactionDetail $batch)
@@ -44,13 +54,40 @@ class ClinicStockController extends Controller
         $drug = $batch->drug();
         $judul = "Retur Obat ". $drug->name;
         if($request->isMethod('get')){
-            return view("pages.inventory.retur",compact('batch','judul'));
-        //pembuatan barang retur
-    }elseif ($request->isMethod('post')) {
-        $transaction = Transaction::create([
-            "vendor_id"=>$batch->transaction->vendor()->id,
-                "destination"=>"warehouse",
-                "variant"=>"Retur",
+            return view("pages.clinic.retur",compact('batch','judul'));
+        }elseif ($request->isMethod('post')) {
+            $validator = \Validator::make($request->all(), [
+                'quantity' => 'required|numeric|min:1',
+            ]);
+            if ($validator->fails()) {
+                session()->flash('error', 'Gagal mengembalikan obat');
+                return redirect()->back()->withInput();
+            }
+            $vendor_id = null;
+            if ($batch->transaction->variant === 'LPK') {
+                $warehouseTransaction = TransactionDetail::where('drug_id', $drug->id)
+                    ->where('stock', '>', 0)
+                    ->whereHas('transaction', function($q) {
+                        $q->where('variant', 'LPB');
+                    })
+                    ->first();
+                
+                if (!$warehouseTransaction) {
+                    throw new \Exception('Could not find original warehouse transaction for this drug');
+                }
+                $vendor_id = $warehouseTransaction->transaction->vendor_id;
+            } else {
+                $vendor_id = $batch->transaction->vendor_id;
+            }
+
+            if (!$vendor_id) {
+                throw new \Exception('Could not determine vendor for return');
+            }
+
+            $transaction = Transaction::create([
+                "vendor_id" => $vendor_id,
+                "destination" => "clinic",
+                "variant" => "Retur",
             ]);
             $detail = TransactionDetail::create([
                 "transaction_id"=>$transaction->id,
@@ -59,7 +96,8 @@ class ClinicStockController extends Controller
                 "name"=>$drug->name." 1 pcs",
                 "quantity"=>$request->quantity." pcs",
                 "piece_price"=>$drug->last_price,
-                "total_price"=>$request->quantity * $drug->last_price
+                "total_price"=>$request->quantity * $drug->last_price,
+                "flow"=>0
             ]);
             $transaction->generate_code();
             Retur::create([
@@ -73,10 +111,15 @@ class ClinicStockController extends Controller
             ]);
             $batch->stock = $batch->stock - $request->quantity*$drug->piece_netto;
             $batch->save();
-            $warehouse = Warehouse::where('drug_id',$drug->id)->first();
-            $warehouse->quantity = $warehouse->quantity - $request->quantity*$drug->piece_netto;
-            $warehouse->save();
-            return redirect()->route('inventory.stocks.show',$drug->id)->with('success','Berhasil melakukan retur');
+            
+            $clinic = Clinic::where('drug_id',$drug->id)->first();
+            if (!$clinic) {
+                throw new \Exception('Clinic stock not found for this drug');
+            }
+            $clinic->quantity = $clinic->quantity - $request->quantity*$drug->piece_netto;
+            $clinic->save();
+            
+            return redirect()->route('clinic.stocks.show',$drug->id)->with('success','Berhasil melakukan retur');
         }
     }
     public function trash(Request $request,TransactionDetail $batch)
@@ -84,12 +127,40 @@ class ClinicStockController extends Controller
         $drug = $batch->drug();
         $judul = "Buang Obat ". $drug->name;
         if($request->isMethod('get')){
-            return view("pages.inventory.trash",compact('batch','judul'));
+            return view("pages.clinic.trash",compact('batch','judul'));
             //pembuatan barang buang
         }elseif($request->isMethod('post')){
+            $validator = \Validator::make($request->all(), [
+                'quantity' => 'required|numeric|min:1',
+            ]);
+            if ($validator->fails()) {
+                session()->flash('error', 'Gagal membuang obat');
+                return redirect()->back()->withInput();
+            }
+            $vendor_id = null;
+            if ($batch->transaction->variant === 'LPK') {
+                $warehouseTransaction = TransactionDetail::where('drug_id', $drug->id)
+                    ->where('stock', '>', 0)
+                    ->whereHas('transaction', function($q) {
+                        $q->where('variant', 'LPB');
+                    })
+                    ->first();
+                
+                if (!$warehouseTransaction) {
+                    throw new \Exception('Could not find original warehouse transaction for this drug');
+                }
+                $vendor_id = $warehouseTransaction->transaction->vendor_id;
+            } else {
+                $vendor_id = $batch->transaction->vendor_id;
+            }
+
+            if (!$vendor_id) {
+                throw new \Exception('Could not determine vendor for trash');
+            }
+
             $transaction = Transaction::create([
-                "vendor_id"=>$batch->transaction->vendor()->id,
-                "destination"=>"warehouse",
+                "vendor_id" => $vendor_id,
+                "destination"=>"clinic",
                 "variant"=>"Trash",
                 "loss"=>$request->quantity*$drug->last_price
             ]);
@@ -100,7 +171,8 @@ class ClinicStockController extends Controller
                 "name"=>$drug->name." 1 pcs",
                 "quantity"=>$request->quantity." pcs",
                 "piece_price"=>$drug->last_price,
-                "total_price"=>$request->quantity * $drug->last_price
+                "total_price"=>$request->quantity * $drug->last_price,
+                "flow"=>$request->quantity*$drug->piece_netto*-1
             ]);
             $transaction->generate_code();
             Trash::create([
@@ -112,10 +184,15 @@ class ClinicStockController extends Controller
             ]);
             $batch->stock = $batch->stock - $request->quantity*$drug->piece_netto;
             $batch->save();
-            $warehouse = Clinic::where('drug_id',$drug->id)->first();
-            $warehouse->quantity = $warehouse->quantity - $request->quantity*$drug->piece_netto;
-            $warehouse->save();
-            return redirect()->route('inventory.stocks.show',$drug->id)->with('success','Berhasil melakukan pembuangan');
+            
+            $clinic = Clinic::where('drug_id',$drug->id)->first();
+            if (!$clinic) {
+                throw new \Exception('Clinic stock not found for this drug');
+            }
+            $clinic->quantity = $clinic->quantity - $request->quantity*$drug->piece_netto;
+            $clinic->save();
+            
+            return redirect()->route('clinic.stocks.show',$drug->id)->with('success','Berhasil melakukan pembuangan');
         }
     }
 }

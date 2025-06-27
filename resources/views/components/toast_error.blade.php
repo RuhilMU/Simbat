@@ -10,7 +10,28 @@
                 </svg>
                 <span class="sr-only">Check icon</span>
             </div>
-            <div class="ml-3 text-sm font-normal">{{ session('error') }}</div>
+            <div class="ml-3 text-sm font-normal">
+                @if($errors->any())
+                    @php
+                        $hasUniqueError = false;
+                        foreach($errors->all() as $error) {
+                            if (str_contains($error, 'sudah ada')) {
+                                $hasUniqueError = true;
+                                break;
+                            }
+                        }
+                    @endphp
+                    @if($hasUniqueError)
+                        @foreach($errors->all() as $error)
+                            {{ $error }}
+                        @endforeach
+                    @elseif(session('error'))
+                        {{ session('error') }}
+                    @endif
+                @elseif(session('error'))
+                    {{ session('error') }}
+                @endif
+            </div>
             <button type="button" onclick=""
                 class="-mx-1.5 -my-1.5 ml-auto inline-flex h-8 w-8 items-center justify-center rounded-lg bg-white p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-900 focus:ring-2 focus:ring-gray-300 light:bg-gray-800 light:text-gray-500 light:hover:bg-gray-700 light:hover:text-white"
                 aria-label="Close">

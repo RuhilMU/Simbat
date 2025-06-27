@@ -38,9 +38,9 @@
                 </thead>
                 <tbody id="transaction-value"></tbody>
                 <tbody id="transaction-data">
-                    @foreach ($transactions as $number => $item)
+                    @foreach ($transactions as $item)
                         <tr class="border-b border-gray-200 hover:bg-gray-100">
-                            <td class="text-center py-3">{{ $number + 1 }}</td>
+                            <td class="text-center py-3">{{ $loop->iteration + ($transactions->currentPage() - 1) * $transactions->perPage() }}</td>
                             <td class="text-center py-3">{{ $item->code }}</td>
                             <td class="text-center py-3">
                                 {{ Carbon::parse($item->created_at)->translatedFormat('j F Y') }}
@@ -63,8 +63,8 @@
                                 @php
                                     $routes = [
                                         'Checkout' => route('transaction.show', $item->id),
-                                        'Trash' => $item->trash() ? route('management.trash.show', $item->id) : null,
-                                        'Retur' => $item->retur() ? route('management.retur.show', $item->id) : null,
+                                        'Trash' => $item->trash() ? route('management.trash.show', $item->trash()->id) : null,
+                                        'Retur' => $item->retur() ? route('management.retur.show', $item->retur()->id) : null,
                                         'LPB' => route('inventory.inflows.show', $item->id),
                                         'default' => route('clinic.inflows.show', $item->id),
                                     ];
@@ -72,7 +72,7 @@
                                     $route = $routes[$item->variant] ?? $routes['default'];
                                 @endphp
 
-                                <a href="{{ $routes[$item->variant] ?? $routes['default'] }}"
+                                <a href="{{ $route }}"
                                     class="bg-blue-500 hover:bg-blue-600 p-2 rounded-md">
                                     @include('icons.mata')
                                 </a>
@@ -172,8 +172,8 @@
                                     }
                                     let routes = {
                                         'Checkout': `/transaction/${item.id}`,
-                                        'Trash': `/management/trash/${item.id}`,
-                                        'Retur': `/management/retur/${item.id}`,
+                                        'Trash': item.trash ? `/management/trash/${item.trash.id}` : null,
+                                        'Retur': item.retur ? `/management/retur/${item.retur.id}` : null,
                                         'LPB': `/inventory/inflows/${item.id}`,
                                         'default': `/clinic/inflows/${item.id}`
                                     };

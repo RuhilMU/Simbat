@@ -132,7 +132,12 @@
         // Build a system
         const ui = SwaggerUIBundle({
             dom_id: '#swagger-ui',
-            urls: urls,
+            urls: [
+                    {
+                        name: "{{ $documentationTitle }}",
+                        url: "{{ url('docs/api-docs.json') }}"
+                    }
+                ],
             "urls.primaryName": "{{ $documentationTitle }}",
             operationsSorter: {!! isset($operationsSorter) ? '"' . $operationsSorter . '"' : 'null' !!},
             configUrl: {!! isset($configUrl) ? '"' . $configUrl . '"' : 'null' !!},

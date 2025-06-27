@@ -19,7 +19,7 @@
             <p class="mt-1 text-gray-600">{{ Carbon::parse($retur->detail()->expired)->translatedFormat('j F Y') }}</p>
         </div>
         <div>
-            <label class="block text-md font-bold">Tanggal Dibuang</label>
+            <label class="block text-md font-bold">Tanggal Retur</label>
             <p class="mt-1 text-gray-600">{{ Carbon::parse($retur->created_at)->translatedFormat('j F Y') }}</p>
         </div>
     </div>
@@ -42,8 +42,9 @@
         
         @if ($retur->status == "Belum Kembali")
             <div class="justify-end flex">
-                <form id="edit-retur-form" action="{{ route('management.retur.pay',$retur->id) }}" method="POST">
+                <form id="retur-receive-form" action="{{ route('management.retur.pay', $retur->id) }}" method="POST">
                     @csrf
+                    <input type="hidden" name="new_expired_date" id="new_expired_date">
                 </form>
                 <button onclick="showExpDateModal()" class="mt-3 bg-blue-500 hover:bg-blue-700 py-1 px-4 rounded-md text-white">Diterima</button>
             </div>
@@ -66,27 +67,41 @@
             </svg>
             <h3 class="text-lg font-semibold text-gray-700 mb-2">Masukkan Tanggal Expired Terbaru</h3>
             <p class="text-sm text-gray-500 mb-5">Silakan pilih tanggal expired terbaru sebelum melanjutkan.</p>
-            <input class="rounded-sm px-2 py-1 ring-2 ring-gray-500 mb-6" type="date" name="end" value="{{ $_GET['end'] ?? '' }}" />
+            <input type="date" id="expired_date_input" 
+                min="{{ Carbon::now()->addDay()->format('Y-m-d') }}"
+                class="rounded-sm px-2 py-1 ring-2 ring-gray-500 mb-6" required />
         </div>
         <div class="flex justify-center space-x-4">
             <button onclick="closeModal()" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 focus:outline-none">
                 Batal
             </button>
-            <button onclick="closeModal(); showModal('save','edit-retur-form')" type="button" class="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-700 focus:outline-none">
+            <button onclick="submitExpDate()" class="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-700 focus:outline-none">
                 Lanjutkan
             </button>
         </div>
     </div>
 </div>
 
-
-
 <script>
     function showExpDateModal() {
         document.getElementById('expDateModal').classList.remove('hidden');
     }
-    function closeExpDateModal() {
+    
+    function closeModal() {
         document.getElementById('expDateModal').classList.add('hidden');
+    }
+
+    function submitExpDate() {
+        const newExpiredDate = document.getElementById('expired_date_input').value;
+        
+        if (!newExpiredDate) {
+            alert('Mohon pilih tanggal expired terbaru');
+            return;
+        }
+
+        document.getElementById('new_expired_date').value = newExpiredDate;
+        document.getElementById('expDateModal').classList.add('hidden');
+        showModal('save', 'retur-receive-form');
     }
 </script>
 @endsection

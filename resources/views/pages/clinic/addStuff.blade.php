@@ -164,6 +164,57 @@
         });
 
     });
+
+    function showToastError(message) {
+        const toast = document.createElement('div');
+        toast.id = 'toast-success';
+        toast.className = 'fixed right-5 top-5 mb-4 flex w-full max-w-xs items-center rounded-lg bg-white p-4 text-gray-500 shadow light:bg-gray-800 light:text-gray-400';
+        toast.innerHTML = `
+            <div class="inline-flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-red-100 text-red-500 light:bg-red-800 light:text-green-200">
+                <svg class="w-5 h-5" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="currentColor" viewBox="0 0 20 20">
+                    <path d="M10 .5a9.5 9.5 0 1 0 9.5 9.5A9.51 9.51 0 0 0 10 .5Zm3.707 11.793a1 1 0 1 1-1.414 1.414L10 11.414l-2.293 2.293a1 1 0 0 1-1.414-1.414L8.586 10 6.293 7.707a1 1 0 0 1 1.414-1.414L10 8.586l2.293-2.293a1 1 0 0 1 1.414 1.414L11.414 10l2.293 2.293Z" />
+                </svg>
+            </div>
+            <div class="ml-3 text-sm font-normal">${message}</div>
+            <button type="button" onclick="this.parentElement.remove()" class="-mx-1.5 -my-1.5 ml-auto inline-flex h-8 w-8 items-center justify-center rounded-lg bg-white p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-900 focus:ring-2 focus:ring-gray-300 light:bg-gray-800 light:text-gray-500 light:hover:bg-gray-700 light:hover:text-white">
+                <svg class="h-3 w-3" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 14 14">
+                    <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m1 1 6 6m0 0 6 6M7 7l6-6M7 7l-6 6" />
+                </svg>
+            </button>
+        `;
+        document.body.appendChild(toast);
+        setTimeout(() => {
+            if (toast.parentElement) {
+                toast.remove();
+            }
+        }, 3000);
+    }
+
+    function showToastSuccess(message) {
+        const toast = document.createElement('div');
+        toast.id = 'toast-success';
+        toast.className = 'fixed right-5 top-5 mb-4 flex w-full max-w-xs items-center rounded-lg bg-white p-4 text-gray-500 shadow light:bg-gray-800 light:text-gray-400';
+        toast.innerHTML = `
+            <div class="inline-flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-green-100 text-green-500 light:bg-green-800 light:text-green-200">
+                <svg class="h-5 w-5" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="currentColor" viewBox="0 0 20 20">
+                    <path d="M10 .5a9.5 9.5 0 1 0 9.5 9.5A9.51 9.51 0 0 0 10 .5Zm3.707 8.207-4 4a1 1 0 0 1-1.414 0l-2-2a1 1 0 0 1 1.414-1.414L9 10.586l3.293-3.293a1 1 0 0 1 1.414 1.414Z" />
+                </svg>
+            </div>
+            <div class="ml-3 text-sm font-normal">${message}</div>
+            <button type="button" onclick="this.parentElement.remove()" class="-mx-1.5 -my-1.5 ml-auto inline-flex h-8 w-8 items-center justify-center rounded-lg bg-white p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-900 focus:ring-2 focus:ring-gray-300 light:bg-gray-800 light:text-gray-500 light:hover:bg-gray-700 light:hover:text-white">
+                <svg class="h-3 w-3" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 14 14">
+                    <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m1 1 6 6m0 0 6 6M7 7l6-6M7 7l-6 6" />
+                </svg>
+            </button>
+        `;
+        document.body.appendChild(toast);
+        setTimeout(() => {
+            if (toast.parentElement) {
+                toast.remove();
+            }
+        }, 3000);
+    }
+
     let data = []
 
     function addStuff() {
@@ -171,23 +222,48 @@
         let drug = document.querySelector("input[name='drug']")
         let quantity = document.querySelector("input[name='quantity']")
         let expired = document.querySelector("input[name='expired']")
-        let input = [code, drug, quantity,expired]
+        let sisa = document.querySelector("input[name='sisa']")
+        let input = [code, drug, quantity, expired]
         let datainput = input.map(e => e.value)
-        if (parseInt(document.querySelector("input[name='sisa']").value) < parseInt(quantity.value)) {
 
-            input.forEach(e => {
-                e.value = null
-            });
-            return alert('kurang');
+        if (!drug.value.trim()) {
+            showToastError('Nama obat harus diisi');
+            return;
         }
-        const status = true
-        if (status) {
-            data.push(datainput)
-            draw()
-            input.forEach(e => {
-                e.value = null
-            });
+
+        if (!quantity.value || parseInt(quantity.value) <= 0) {
+            showToastError('Jumlah harus lebih dari 0');
+            return;
         }
+
+        if (parseInt(sisa.value) < parseInt(quantity.value)) {
+            showToastError(`Stok tidak mencukupi. Sisa stok: ${sisa.value} pcs`);
+            return;
+        }
+
+        const existingIndex = data.findIndex(item => item[1] === datainput[1]); // Check by drug name (index 1)
+        
+        if (existingIndex !== -1) {
+            const newQuantity = parseInt(data[existingIndex][2]) + parseInt(datainput[2]);
+            
+            if (parseInt(sisa.value) < newQuantity) {
+                showToastError(`Total stok tidak mencukupi. Sisa stok: ${sisa.value} pcs`);
+                return;
+            }
+            
+            data[existingIndex][2] = newQuantity.toString();
+            showToastSuccess(`Jumlah ${datainput[1]} diperbarui menjadi ${newQuantity} pcs`);
+        } else {
+            data.push(datainput);
+            showToastSuccess('Obat berhasil ditambahkan');
+        }
+        
+        draw();
+        
+        input.forEach(e => {
+            e.value = null
+        });
+        sisa.value = null;
     }
 
     function draw() {
@@ -233,6 +309,11 @@
     }
 
     function buatModal() {
+        if (data.length === 0) {
+            showToastError('Gagal menambahkan obat');
+            return;
+        }
+
         data = data.map(function(e) {
             return {
                 name: e[1],
@@ -240,7 +321,6 @@
             };
         });
         document.querySelector("input[name='transaction']").value = JSON.stringify(data)
-        // console.log(document.querySelector("input[name='transaction']").value);
         showModal('add', 'add-stuff-form')
     }
 

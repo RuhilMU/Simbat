@@ -23,22 +23,43 @@ class VariantController extends Controller
     }
     public function store(Request $request)
     {
-        $validate = $request->validate([
-            "name"=> "required|min:3|max:25|string"
-        ]);
         try {
+            $validate = $request->validate([
+                "name"=> "required|min:3|max:25|string|unique:variants,name"
+            ], [
+                'name.unique' => 'Jenis obat sudah ada'
+            ]);
             Variant::create([
                 "name"=>$request->name
             ]);
             return back()->with('success','Jenis obat berhasil dibuat');
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            if (isset($e->errors()['name']) && in_array('Jenis obat sudah ada', $e->errors()['name'])) {
+                return back()->withErrors($e->errors())->withInput();
+            }
+            return back()->with('error', 'Jenis obat gagal dibuat')->withInput();
         } catch (\Throwable $e) {
             return back()->with('error','Jenis obat gagal dibuat');
         }
     }
     public function update(Request $request, Variant $variant)
     {
-        $variant->update($request->all());
-        return redirect()->back()->with('success','Jenis berhasil diubah');
+        try {
+            $validate = $request->validate([
+                "name"=> "required|min:3|max:25|string|unique:variants,name," . $variant->id
+            ], [
+                'name.unique' => 'Jenis obat sudah ada'
+            ]);
+            $variant->update($validate);
+            return redirect()->back()->with('success','Jenis berhasil diubah');
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            if (isset($e->errors()['name']) && in_array('Jenis obat sudah ada', $e->errors()['name'])) {
+                return back()->withErrors($e->errors())->withInput();
+            }
+            return back()->with('error', 'Jenis gagal diubah')->withInput();
+        } catch (\Throwable $e) {
+            return redirect()->back()->with('error','Jenis gagal diubah');
+        }
     }
     public function destroy(Variant $variant)
     {

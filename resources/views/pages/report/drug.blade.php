@@ -8,19 +8,21 @@ use Carbon\Carbon;
         <button onclick="printModal()" class="rounded-lg bg-yellow-500 hover:bg-yellow-600 px-4 py-1 text-white">Cetak</button>
     </div>
     <div class="flex items-center justify-between w-full">
-        <form action="" class="flex w-auto flex-row justify-between gap-3 ">
-            <input class="rounded-sm px-2 py-1 ring-2 ring-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500" type="date" name="" id="" />
+        <form action="{{ route('report.drugs.index') }}" method="GET" class="flex w-auto flex-row justify-between gap-3 ">
+            <input class="rounded-sm px-2 py-1 ring-2 ring-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500" 
+                   type="date" name="start" id="startDate" value="{{ $startDate ?? '' }}" />
             <h1 class="text-lg font-inter text-gray-800">sampai</h1>
-            <input class="rounded-sm px-2 py-1 ring-2 ring-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500" type="date" name="" id="" />
+            <input class="rounded-sm px-2 py-1 ring-2 ring-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500" 
+                   type="date" name="end" id="endDate" value="{{ $endDate ?? '' }}" />
             <button class="rounded-2xl bg-blue-500 px-3 font-bold text-sm font-inter text-white hover:bg-blue-600"
                 type="submit">
                 TERAPKAN
             </button>
         </form>
-        <form action="" class="flex">
-            <input type="text" name="" id="" placeholder="Search..."
-                class="rounded-full px-6 py-2 ring-2 ring-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"/>
-        </form>
+            <form action="{{ route('report.drugs.index') }}" method="GET" class="flex">
+                <input type="text" name="query" id="searchInput" placeholder="Search..." value="{{ request('query') }}"
+                    class="rounded-full px-6 py-2 ring-2 ring-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500" />
+            </form>
     </div>
 
     <div class="overflow-hidden rounded-lg bg-white shadow-md mt-6">
@@ -34,18 +36,18 @@ use Carbon\Carbon;
                 <th class="py-4">Expired Terbaru</th>
                 <th class="py-4">Action</th>
             </thead>
-            <tbody>
-                @foreach ($stocks as $number => $item)
 
+            <tbody id="suggestions">
+                @foreach ($stocks as $number => $item)
                 <tr class="border-b border-gray-200 hover:bg-gray-100">
                     <td class="py-3">{{ $number + 1 }}</td>
-                    <td class="py-3">{{ $item->drug()->code }}</td>
-                    <td class="py-3 text-left">{{ $item->drug()->name }}</td>
-                    <td class="py-3">{{ floor($item->quantity/$item->drug()->piece_netto) }} pcs</td>
-                    <td class="py-3">{{ Carbon::parse($item->oldest)->translatedFormat('j F Y') }}</td>
-                    <td class="py-3">{{ Carbon::parse($item->latest)->translatedFormat('j F Y') }}</td>
+                    <td class="py-3">{{ $item->drug->code }}</td>
+                    <td class="py-3 text-left">{{ $item->drug->name }}</td>
+                    <td class="py-3">{{ floor($item->quantity/$item->drug->piece_netto) }} pcs</td>
+                    <td class="py-3">{{ $item->oldest ? Carbon::parse($item->oldest)->translatedFormat('j F Y') : '-' }}</td>
+                    <td class="py-3">{{ $item->latest ? Carbon::parse($item->latest)->translatedFormat('j F Y') : '-' }}</td>
                     <td class="flex justify-center py-3">
-                        <a href="{{ route('report.drugs.show', $item->drug()->id) }}"
+                        <a href="{{ route('report.drugs.show', $item->drug->id) }}"
                             class="rounded-md bg-blue-500 p-2 hover:bg-blue-600">
                             <svg width="20" height="20" viewBox="0 0 20 20" fill="none"
                                 xmlns="http://www.w3.org/2000/svg">
@@ -61,7 +63,7 @@ use Carbon\Carbon;
         </table>
     </div>
     <div class="p-6">
-        {{ $stocks->links() }}
+        {{ $stocks->appends(request()->query())->links() }}
     </div>
 </div>
 <div id="printModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden">
@@ -98,7 +100,43 @@ use Carbon\Carbon;
 </div>
 
 <script>
-       function printModal() {
+    document.getElementById('searchInput').addEventListener('keyup', function() {
+        const searchValue = this.value;
+        const startDate = document.getElementById('startDate').value;
+        const endDate = document.getElementById('endDate').value;
+        
+        let url = '/report/drugs?query=' + searchValue;
+        if (startDate) url += '&start=' + startDate;
+        if (endDate) url += '&end=' + endDate;
+        
+        if (searchValue.length > 0) {
+            fetch(url)
+                .then(response => response.text())
+                .then(html => {
+                    const parser = new DOMParser();
+                    const doc = parser.parseFromString(html, 'text/html');
+                    const newSuggestions = doc.getElementById('suggestions');
+                    const newPagination = doc.querySelector('.p-6');
+                    
+                    document.getElementById('suggestions').innerHTML = newSuggestions.innerHTML;
+                    document.querySelector('.p-6').innerHTML = newPagination.innerHTML;
+                });
+        } else {
+            fetch(url)
+                .then(response => response.text())
+                .then(html => {
+                    const parser = new DOMParser();
+                    const doc = parser.parseFromString(html, 'text/html');
+                    const newSuggestions = doc.getElementById('suggestions');
+                    const newPagination = doc.querySelector('.p-6');
+                    
+                    document.getElementById('suggestions').innerHTML = newSuggestions.innerHTML;
+                    document.querySelector('.p-6').innerHTML = newPagination.innerHTML;
+                });
+        }
+    });
+
+    function printModal() {
         document.getElementById('printModal').classList.remove('hidden');
     }
 
@@ -111,25 +149,24 @@ use Carbon\Carbon;
 
     function exportToExcel() {
         closePrintModal();
-        window.location.href = "/export-excel";
+        const startDate = document.getElementById('startDate').value;
+        const endDate = document.getElementById('endDate').value;
+        let url = "/export-excel";
+        if (startDate && endDate) {
+            url += "?start=" + startDate + "&end=" + endDate;
+        }
+        window.location.href = url;
     }
 
     function submitModal() {
         closePrintModal();
-        window.location.href = "/export-pdf";
-    }
-
-    document.getElementById('printButton').onclick = function() {
-        document.getElementById('printOptions').classList.toggle('invisible');
-    };
-    document.getElementById('confirmPrint').onclick = function() {
-        const format = document.getElementById('format').value;
-        if (format === 'pdf') {
-            alert('Mencetak dalam format PDF...');
-        } else if (format === 'excel') {
-            alert('Mencetak dalam format Excel...');
+        const startDate = document.getElementById('startDate').value;
+        const endDate = document.getElementById('endDate').value;
+        let url = "/export-pdf";
+        if (startDate && endDate) {
+            url += "?start=" + startDate + "&end=" + endDate;
         }
-        document.getElementById('printOptions').classList.add('invisible');
-    };
+        window.location.href = url;
+    }
 </script>
 @endsection

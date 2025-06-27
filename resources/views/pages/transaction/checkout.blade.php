@@ -5,6 +5,7 @@
     <form method="POST" class="hidden" action="{{ route('transaction.store') }}" id="add-stuff-form">
         @csrf
         <input type="hidden" name="transaction">
+        <input type="hidden" name="source" id="sourceInput" value="warehouse">
     </form>
     <body style="margin: 40px; font-family: sans-serif;">
         <div class="flex justify-center mb-6">
@@ -140,6 +141,7 @@
         let totalDisc = 0;
         let totalPay = 0;
         let discMeth = 'persen';
+        let currentSource = 'warehouse';
 
         document.querySelectorAll("input[type='radio']").forEach(function(e) {
             e.addEventListener('change', (f) => {
@@ -147,7 +149,27 @@
                 draw()
             })
         })
-        document.querySelector("input[name='transactionDiscount']").addEventListener('input', () => draw())
+        document.querySelector("input[name='transactionDiscount']").addEventListener('input', () => {
+            let discountInput = document.querySelector("input[name='transactionDiscount']");
+            let discountValue = parseInt(discountInput.value) || 0;
+            let discountType = document.querySelector('input[name="discount"]:checked').value;
+            
+            // Prevent negative values
+            if (discountValue < 0) {
+                discountInput.value = 0;
+                showToastError('Diskon tidak boleh negatif');
+                return;
+            }
+            
+            // Prevent percentage over 100
+            if (discountType === 'persen' && discountValue > 100) {
+                discountInput.value = 100;
+                showToastError('Diskon persentase tidak boleh lebih dari 100%');
+                return;
+            }
+            
+            draw();
+        })
 
         document.addEventListener('DOMContentLoaded', function() {
             const suggestions = document.getElementById('suggestions');
@@ -157,7 +179,7 @@
                 const query = this.value;
                 timeout = setTimeout(() => {
                     if (query.length > 0) {
-                        fetch(`/drug-repack?query=${query}`)
+                        fetch(`/drug-repack?query=${query}&source=${currentSource}`)
                             .then(response => response.json())
                             .then(data => {
                                 suggestions.innerHTML = '';
@@ -165,12 +187,9 @@
                                     suggestions.classList.remove('hidden');
                                     data.forEach(item => {
                                         const option = document.createElement('li');
-                                        option.textContent =
-                                            `${item.name} (${formatRupiah(item.price)})`;
-                                        option.classList.add('p-2', 'cursor-pointer',
-                                            'hover:bg-gray-100');
-                                        option.addEventListener('click', () =>
-                                            clickedOption(item));
+                                        option.textContent = `${item.name} (${formatRupiah(item.price)})`;
+                                        option.classList.add('p-2', 'cursor-pointer', 'hover:bg-gray-100');
+                                        option.addEventListener('click', () => clickedOption(item));
                                         suggestions.appendChild(option);
                                     });
                                 } else {
@@ -186,18 +205,19 @@
         });
 
         function clickedOption(item) {
-            const drugInput = document.querySelector("#drugInput")
-            const drugStock = document.querySelector("input[name='stock']")
-            const drugPrice = document.querySelector("input[name='price']")
-            const repackQuantity = document.querySelector("input[name='repackQuantity']")
-            const drugDiscount = document.querySelector("input[name='drugDiscount']")
-            document.getElementById('drugInput').value = item.name
-            suggestions.classList.add('hidden')
-            repackSelected = item.id
-            drugStock.value = item.stock
-            drugPrice.value = item.price
-            repackQuantity.value = item.quantity
-            drugDiscount.value = item.drug.last_discount
+            const drugInput = document.querySelector("#drugInput");
+            const drugStock = document.querySelector("input[name='stock']");
+            const drugPrice = document.querySelector("input[name='price']");
+            const repackQuantity = document.querySelector("input[name='repackQuantity']");
+            const drugDiscount = document.querySelector("input[name='drugDiscount']");
+            
+            drugInput.value = item.name;
+            suggestions.classList.add('hidden');
+            repackSelected = item.id;
+            drugStock.value = item.stock;
+            drugPrice.value = item.price;
+            repackQuantity.value = item.quantity;
+            drugDiscount.value = item.drug.last_discount;
         }
 
         function addStuff() {
@@ -208,13 +228,66 @@
             let repackId = repackSelected
             let quantity = document.querySelector("input[name='quantity']")
             let repackQuantity = document.querySelector("input[name='repackQuantity']")
+            
+            // Validation: Drug must be selected
+            if (!repackSelected || !repackName.value.trim()) {
+                showToastError('Silakan pilih obat terlebih dahulu');
+                return;
+            }
+            
+            // Validation: Quantity must be filled and greater than 0
+            if (!quantity.value || parseInt(quantity.value) <= 0) {
+                showToastError('Jumlah harus lebih dari 0');
+                return;
+            }
+            
+            // Validation: Quantity must not exceed available stock
             if (parseInt(document.querySelector("input[name='stock']").value) < parseInt(quantity.value)) {
+                showToastError('Stok tidak mencukupi');
+                return;
+            }
+            
+            // Validation: Transaction discount validation
+            let transactionDiscount = parseInt(document.querySelector("input[name='transactionDiscount']").value) || 0;
+            if (transactionDiscount < 0) {
+                showToastError('Diskon transaksi tidak boleh negatif');
+                return;
+            }
+            
+            // Check if discount type is percentage and validate
+            let discountType = document.querySelector('input[name="discount"]:checked').value;
+            if (discountType === 'persen' && transactionDiscount > 100) {
+                showToastError('Diskon persentase tidak boleh lebih dari 100%');
+                return;
+            }
+            
+            // Check for duplicate drug and update quantity if exists
+            let existingIndex = data.findIndex(item => item[6] === repackId); // repackId is at index 6
+            if (existingIndex !== -1) {
+                // Drug already exists, update quantity
+                let newQuantity = parseInt(data[existingIndex][3]) + parseInt(quantity.value); // quantity is at index 3
+                let availableStock = parseInt(document.querySelector("input[name='stock']").value);
+                
+                if (newQuantity > availableStock) {
+                    showToastError('Total stok tidak mencukupi untuk menambah jumlah ini');
+                    return;
+                }
+                
+                // Update existing item
+                data[existingIndex][3] = newQuantity; // Update quantity
+                data[existingIndex][5] = calculateDiscount(newQuantity * data[existingIndex][1], data[existingIndex][0]); // Update discount
+                
+                // Clear input fields
                 let input = [discDrug, piecePrice, repackName, quantity, repackQuantity]
                 input.forEach(e => {
                     e.value = null
                 });
-                return alert('kurang');
+                
+                draw();
+                return;
             }
+            
+            // Add new item
             let input = [discDrug, piecePrice, repackName, quantity, repackQuantity]
             let datainput = input.map(e => e.value)
             datainput.push(calculateDiscount(quantity.value * piecePrice.value, discDrug.value))
@@ -232,7 +305,7 @@
                 currency: 'IDR',
                 minimumFractionDigits: 0
             }).format(angka);
-        } // Output: "Rp 100.000"
+        } // Output: "Rp 100.000"
 
         function row(datainput, i) {
             [discDrug, piecePrice, repackName, quantity, repackQuantity, priceDiscount, repackId] = datainput
@@ -310,6 +383,12 @@
         }
 
         function buatModal() {
+            // Validation: Check if there are items in cart
+            if (data.length === 0) {
+                showToastError('Silakan tambahkan minimal satu item obat');
+                return;
+            }
+            
             console.log(data);
             data = data.map(function(e) {
                 return {
@@ -326,7 +405,8 @@
                 data,
                 total,
                 totalDisc,
-                totalPay
+                totalPay,
+                source: currentSource
             }
             document.querySelector("input[name='transaction']").value = JSON.stringify(sendData)
             showModal('add', 'add-stuff-form')
@@ -336,6 +416,7 @@
         function setActiveTab(tab) {
             const inventory = document.getElementById('inventoryTab');
             const klinik = document.getElementById('klinikTab');
+            const sourceInput = document.getElementById('sourceInput');
 
             if (tab === 'inventory') {
               inventory.classList.add('text-white');
@@ -343,15 +424,152 @@
 
               klinik.classList.add('bg-white', 'text-gray-800');
               klinik.classList.remove('text-white');
+              currentSource = 'warehouse';
             } else {
               klinik.classList.add('text-white');
               klinik.classList.remove('bg-white', 'text-gray-800');
 
               inventory.classList.add('bg-white', 'text-gray-800');
               inventory.classList.remove('text-white');
+              currentSource = 'clinic';
             }
+            sourceInput.value = currentSource;
+            document.getElementById('drugInput').value = '';
+            document.querySelector("input[name='stock']").value = '0';
+            document.querySelector("input[name='price']").value = '0';
+            document.querySelector("input[name='repackQuantity']").value = '';
+            document.querySelector("input[name='drugDiscount']").value = '0';
+            repackSelected = null;
+            suggestions.classList.add('hidden');
           }
 
+        function showToastError(message) {
+            const toast = document.createElement('div');
+            toast.id = 'temp-toast-error';
+            toast.className = 'fixed right-5 top-5 mb-4 flex w-full max-w-xs items-center rounded-lg bg-white p-4 text-gray-500 shadow light:bg-gray-800 light:text-gray-400';
+            toast.innerHTML = `
+                <div class="inline-flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-red-100 text-red-500 light:bg-red-800 light:text-green-200">
+                    <svg class="w-5 h-5" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="currentColor" viewBox="0 0 20 20">
+                        <path d="M10 .5a9.5 9.5 0 1 0 9.5 9.5A9.51 9.51 0 0 0 10 .5Zm3.707 11.793a1 1 0 1 1-1.414 1.414L10 11.414l-2.293 2.293a1 1 0 0 1-1.414-1.414L8.586 10 6.293 7.707a1 1 0 0 1 1.414-1.414L10 8.586l2.293-2.293a1 1 0 0 1 1.414 1.414L11.414 10l2.293 2.293Z" />
+                    </svg>
+                </div>
+                <div class="ml-3 text-sm font-normal">${message}</div>
+                <button type="button" onclick="this.parentElement.remove()" class="-mx-1.5 -my-1.5 ml-auto inline-flex h-8 w-8 items-center justify-center rounded-lg bg-white p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-900 focus:ring-2 focus:ring-gray-300 light:bg-gray-800 light:text-gray-500 light:hover:bg-gray-700 light:hover:text-white">
+                    <svg class="h-3 w-3" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 14 14">
+                        <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m1 1 6 6m0 0 6 6M7 7l6-6M7 7l-6 6" />
+                    </svg>
+                </button>
+            `;
+            document.body.appendChild(toast);
+            
+            setTimeout(() => {
+                if (toast.parentElement) {
+                    toast.remove();
+                }
+            }, 3000);
+        }
+
+        function showToastSuccess(message) {
+            const toast = document.createElement('div');
+            toast.id = 'temp-toast-success';
+            toast.className = 'fixed right-5 top-5 mb-4 flex w-full max-w-xs items-center rounded-lg bg-white p-4 text-gray-500 shadow light:bg-gray-800 light:text-gray-400';
+            toast.innerHTML = `
+                <div class="inline-flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-green-100 text-green-500 light:bg-green-800 light:text-green-200">
+                    <svg class="h-5 w-5" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="currentColor" viewBox="0 0 20 20">
+                        <path d="M10 .5a9.5 9.5 0 1 0 9.5 9.5A9.51 9.51 0 0 0 10 .5Zm3.707 8.207-4 4a1 1 0 0 1-1.414 0l-2-2a1 1 0 0 1 1.414-1.414L9 10.586l3.293-3.293a1 1 0 0 1 1.414 1.414Z" />
+                    </svg>
+                </div>
+                <div class="ml-3 text-sm font-normal">${message}</div>
+                <button type="button" onclick="this.parentElement.remove()" class="-mx-1.5 -my-1.5 ml-auto inline-flex h-8 w-8 items-center justify-center rounded-lg bg-white p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-900 focus:ring-2 focus:ring-gray-300 light:bg-gray-800 light:text-gray-500 light:hover:bg-gray-700 light:hover:text-white">
+                    <svg class="h-3 w-3" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 14 14">
+                        <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m1 1 6 6m0 0 6 6M7 7l6-6M7 7l-6 6" />
+                    </svg>
+                </button>
+            `;
+            document.body.appendChild(toast);
+            
+            setTimeout(() => {
+                if (toast.parentElement) {
+                    toast.remove();
+                }
+            }, 3000);
+        }
 
     </script>
+    @if($errors->any() || session('error'))
+    <div id="checkout-toast-error"
+            class="fixed right-5 top-5 mb-4 flex w-full max-w-xs items-center rounded-lg bg-white p-4 text-gray-500 shadow light:bg-gray-800 light:text-gray-400"
+            role="alert">
+            <div
+                class="inline-flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-red-100 text-red-500 light:bg-red-800 light:text-green-200">
+                <svg class="w-5 h-5" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="currentColor"
+                    viewBox="0 0 20 20">
+                    <path
+                        d="M10 .5a9.5 9.5 0 1 0 9.5 9.5A9.51 9.51 0 0 0 10 .5Zm3.707 11.793a1 1 0 1 1-1.414 1.414L10 11.414l-2.293 2.293a1 1 0 0 1-1.414-1.414L8.586 10 6.293 7.707a1 1 0 0 1 1.414-1.414L10 8.586l2.293-2.293a1 1 0 0 1 1.414 1.414L11.414 10l2.293 2.293Z" />
+                </svg>
+                <span class="sr-only">Error icon</span>
+            </div>
+            <div class="ml-3 text-sm font-normal">
+                @if($errors->any())
+                    @foreach($errors->all() as $error)
+                        {{ $error }}
+                    @endforeach
+                @elseif(session('error'))
+                    {{ session('error') }}
+                @endif
+            </div>
+            <button type="button" onclick="this.parentElement.remove()"
+                class="-mx-1.5 -my-1.5 ml-auto inline-flex h-8 w-8 items-center justify-center rounded-lg bg-white p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-900 focus:ring-2 focus:ring-gray-300 light:bg-gray-800 light:text-gray-500 light:hover:bg-gray-700 light:hover:text-white"
+                aria-label="Close">
+                <span class="sr-only">Close</span>
+                <svg class="h-3 w-3" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none"
+                    viewBox="0 0 14 14">
+                    <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="m1 1 6 6m0 0 6 6M7 7l6-6M7 7l-6 6" />
+                </svg>
+            </button>
+        </div>
+        <script>
+            setTimeout(() => {
+                const toast = document.getElementById('checkout-toast-error');
+                if (toast) {
+                    toast.remove();
+                }
+            }, 3000);
+        </script>
+    @endif
+    @if(session('success'))
+    <div id="checkout-toast-success"
+            class="fixed right-5 top-5 mb-4 flex w-full max-w-xs items-center rounded-lg bg-white p-4 text-gray-500 shadow light:bg-gray-800 light:text-gray-400"
+            role="alert">
+            <div
+                class="inline-flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-green-100 text-green-500 light:bg-green-800 light:text-green-200">
+                <svg class="h-5 w-5" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="currentColor" viewBox="0 0 20 20">
+                    <path d="M10 .5a9.5 9.5 0 1 0 9.5 9.5A9.51 9.51 0 0 0 10 .5Zm3.707 8.207-4 4a1 1 0 0 1-1.414 0l-2-2a1 1 0 0 1 1.414-1.414L9 10.586l3.293-3.293a1 1 0 0 1 1.414 1.414Z" />
+                </svg>
+                <span class="sr-only">Success icon</span>
+            </div>
+            <div class="ml-3 text-sm font-normal">
+                {{ session('success') }}
+            </div>
+            <button type="button" onclick="this.parentElement.remove()"
+                class="-mx-1.5 -my-1.5 ml-auto inline-flex h-8 w-8 items-center justify-center rounded-lg bg-white p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-900 focus:ring-2 focus:ring-gray-300 light:bg-gray-800 light:text-gray-500 light:hover:bg-gray-700 light:hover:text-white"
+                aria-label="Close">
+                <span class="sr-only">Close</span>
+                <svg class="h-3 w-3" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none"
+                    viewBox="0 0 14 14">
+                    <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="m1 1 6 6m0 0 6 6M7 7l6-6M7 7l-6 6" />
+                </svg>
+            </button>
+        </div>
+        <script>
+            setTimeout(() => {
+                const toast = document.getElementById('checkout-toast-success');
+                if (toast) {
+                    toast.remove();
+                }
+            }, 3000);
+        </script>
+    @endif
 @endsection

@@ -23,22 +23,69 @@ class VendorController extends Controller
     }
     public function store(Request $request)
     {
-        $validate = $request->validate([
-            "name"=> "required|min:3|max:25|string",
-            "phone"=>"required|max:14",
-            "address"=>"required|string|max:255",
-        ]);
         try {
+            $validate = $request->validate([
+                "name"=> "required|min:3|max:25|string|unique:vendors,name",
+                "phone"=>"required|max:14",
+                "address"=>"required|string|max:255",
+            ], [
+                'name.unique' => 'Vendor sudah ada'
+            ]);
             Vendor::create($validate);
             return redirect()->back()->with('success','Vendor berhasil dibuat');
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            $allErrors = $e->errors();
+            $allAreDuplicates = true;
+            
+            foreach ($allErrors as $field => $errors) {
+                foreach ($errors as $error) {
+                    if ($error !== 'Vendor sudah ada') {
+                        $allAreDuplicates = false;
+                        break 2;
+                    }
+                }
+            }
+            
+            if ($allAreDuplicates) {
+                return back()->withErrors($e->errors())->withInput();
+            }
+            return back()->with('error', 'Vendor gagal dibuat')->withInput();
         } catch (\Throwable $th) {
             return redirect()->back()->with('error','Vendor gagal dibuat');
         }
     }
     public function update(Request $request, Vendor $vendor)
     {
-        $vendor->update($request->all());
-        return redirect()->back()->with('success','Vendor berhasil diubah');
+        try {
+            $validate = $request->validate([
+                "name"=> "required|min:3|max:25|string|unique:vendors,name," . $vendor->id,
+                "phone"=>"required|max:14",
+                "address"=>"required|string|max:255",
+            ], [
+                'name.unique' => 'Vendor sudah ada'
+            ]);
+            $vendor->update($validate);
+            return redirect()->back()->with('success','Vendor berhasil diubah');
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            $allErrors = $e->errors();
+            $allAreDuplicates = true;
+            
+            foreach ($allErrors as $field => $errors) {
+                foreach ($errors as $error) {
+                    if ($error !== 'Vendor sudah ada') {
+                        $allAreDuplicates = false;
+                        break 2;
+                    }
+                }
+            }
+            
+            if ($allAreDuplicates) {
+                return back()->withErrors($e->errors())->withInput();
+            }
+            return back()->with('error', 'Vendor gagal diubah')->withInput();
+        } catch (\Throwable $e) {
+            return redirect()->back()->with('error','Vendor gagal diubah');
+        }
     }
     public function destroy(Vendor $vendor)
     {

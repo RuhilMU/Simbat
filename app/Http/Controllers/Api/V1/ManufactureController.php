@@ -19,12 +19,13 @@ class ManufactureController extends ApiController
      * @OA\Get(
      *     path="/api/v1/manufactures",
      *     tags={"Manufactures"},
+     *     security={{"bearerAuth":{}}},
      *     summary="Get list of manufacturers",
      *     description="Returns a paginated list of manufacturers with optional search functionality",
      *     @OA\Parameter(
      *         name="search",
      *         in="query",
-     *         description="Search term for manufacturer name or code",
+     *         description="Search term for manufacturer name",
      *         required=false,
      *         @OA\Schema(type="string")
      *     ),
@@ -47,7 +48,6 @@ class ManufactureController extends ApiController
      *                 @OA\Property(property="data", type="array", @OA\Items(
      *                     @OA\Property(property="id", type="integer"),
      *                     @OA\Property(property="name", type="string"),
-     *                     @OA\Property(property="code", type="string"),
      *                     @OA\Property(property="drugs", type="array", @OA\Items(type="object"))
      *                 )),
      *                 @OA\Property(property="current_page", type="integer"),
@@ -65,8 +65,7 @@ class ManufactureController extends ApiController
         // Search functionality
         if ($request->has('search')) {
             $query->where(function($q) use ($request) {
-                $q->where('name', 'like', '%' . $request->search . '%')
-                  ->orWhere('code', 'like', '%' . $request->search . '%');
+                $q->where('name', 'like', '%' . $request->search . '%');
             });
         }
 
@@ -85,8 +84,9 @@ class ManufactureController extends ApiController
      * @OA\Post(
      *     path="/api/v1/manufactures",
      *     tags={"Manufactures"},
+     *     security={{"bearerAuth":{}}},
      *     summary="Create a new manufacturer",
-     *     description="Creates a new manufacturer with a unique code",
+     *     description="Creates a new manufacturer",
      *     @OA\RequestBody(
      *         required=true,
      *         @OA\JsonContent(
@@ -105,7 +105,6 @@ class ManufactureController extends ApiController
      *                 type="object",
      *                 @OA\Property(property="id", type="integer"),
      *                 @OA\Property(property="name", type="string"),
-     *                 @OA\Property(property="code", type="string"),
      *                 @OA\Property(property="drugs", type="array", @OA\Items(type="object"))
      *             )
      *         )
@@ -137,8 +136,7 @@ class ManufactureController extends ApiController
 
         try {
             $manufacture = Manufacture::create([
-                'name' => $request->name,
-                'code' => 'MFG-' . str_pad(rand(1000, 9999), 4, '0', STR_PAD_LEFT)
+                'name' => $request->name
             ]);
             
             // Load relationships manually
@@ -154,6 +152,7 @@ class ManufactureController extends ApiController
      * @OA\Get(
      *     path="/api/v1/manufactures/{id}",
      *     tags={"Manufactures"},
+     *     security={{"bearerAuth":{}}},
      *     summary="Get manufacturer details",
      *     description="Returns detailed information about a specific manufacturer",
      *     @OA\Parameter(
@@ -174,7 +173,6 @@ class ManufactureController extends ApiController
      *                 type="object",
      *                 @OA\Property(property="id", type="integer"),
      *                 @OA\Property(property="name", type="string"),
-     *                 @OA\Property(property="code", type="string"),
      *                 @OA\Property(property="drugs", type="array", @OA\Items(type="object"))
      *             )
      *         )
@@ -197,6 +195,7 @@ class ManufactureController extends ApiController
      * @OA\Put(
      *     path="/api/v1/manufactures/{id}",
      *     tags={"Manufactures"},
+     *     security={{"bearerAuth":{}}},
      *     summary="Update manufacturer details",
      *     description="Updates the details of an existing manufacturer",
      *     @OA\Parameter(
@@ -224,7 +223,6 @@ class ManufactureController extends ApiController
      *                 type="object",
      *                 @OA\Property(property="id", type="integer"),
      *                 @OA\Property(property="name", type="string"),
-     *                 @OA\Property(property="code", type="string"),
      *                 @OA\Property(property="drugs", type="array", @OA\Items(type="object"))
      *             )
      *         )
@@ -265,6 +263,7 @@ class ManufactureController extends ApiController
      * @OA\Delete(
      *     path="/api/v1/manufactures/{id}",
      *     tags={"Manufactures"},
+     *     security={{"bearerAuth":{}}},
      *     summary="Delete a manufacturer",
      *     description="Deletes a manufacturer if it has no associated drugs",
      *     @OA\Parameter(
@@ -285,7 +284,6 @@ class ManufactureController extends ApiController
      *                 type="object",
      *                 @OA\Property(property="id", type="integer"),
      *                 @OA\Property(property="name", type="string"),
-     *                 @OA\Property(property="code", type="string")
      *             )
      *         )
      *     ),
@@ -316,47 +314,5 @@ class ManufactureController extends ApiController
         } catch (\Exception $e) {
             return $this->errorResponse('Failed to delete manufacture: ' . $e->getMessage(), [], 500);
         }
-    }
-
-    /**
-     * @OA\Get(
-     *     path="/api/v1/manufactures/search",
-     *     tags={"Manufactures"},
-     *     summary="Search manufacturers",
-     *     description="Search manufacturers by name or code",
-     *     @OA\Parameter(
-     *         name="query",
-     *         in="query",
-     *         description="Search query",
-     *         required=true,
-     *         @OA\Schema(type="string")
-     *     ),
-     *     @OA\Response(
-     *         response=200,
-     *         description="Successful operation",
-     *         @OA\JsonContent(
-     *             @OA\Property(property="success", type="boolean", example=true),
-     *             @OA\Property(property="message", type="string", example="Manufactures search results"),
-     *             @OA\Property(
-     *                 property="data",
-     *                 type="array",
-     *                 @OA\Items(
-     *                     @OA\Property(property="id", type="integer"),
-     *                     @OA\Property(property="name", type="string"),
-     *                     @OA\Property(property="code", type="string")
-     *                 )
-     *             )
-     *         )
-     *     )
-     * )
-     */
-    public function search(Request $request)
-    {
-        $query = $request->input('query');
-        $manufactures = Manufacture::where('name', 'like', "%{$query}%")
-                                ->orWhere('code', 'like', "%{$query}%")
-                                ->get();
-
-        return $this->successResponse($manufactures, 'Manufactures search results');
     }
 } 

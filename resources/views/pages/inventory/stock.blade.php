@@ -25,9 +25,9 @@
                 </thead>
                 <tbody id="stock-value"></tbody>
                 <tbody id="stock-data" class="text-gray-700 font-light">
-                    @foreach ($stocks as $number => $item)
+                    @foreach ($stocks as $item)
                         <tr class="border-b border-gray-200 hover:bg-gray-100">
-                            <td class="py-3 px-6 text-center w-1">{{ $number + 1 }}</td>
+                            <td class="py-3 px-6 text-center w-1">{{ $loop->iteration + ($stocks->currentPage() - 1) * $stocks->perPage() }}</td>
                             <td class="py-3 px-6 text-center">{{ $item->drug()->code }}</td>
                             <td class="py-3 px-6 text-left">{{ $item->drug()->name }}</td>
                             <td class="py-3 px-6 text-center">{{ $item->quantity / $item->drug()->piece_netto }}</td>

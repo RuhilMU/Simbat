@@ -13,6 +13,7 @@ use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Maatwebsite\Excel\Facades\Excel;
+use App\Models\Inventory\Clinic;
 
 class ReportController extends Controller
 {
@@ -24,21 +25,139 @@ class ReportController extends Controller
         return response()->json($transactions);
     }
 
-    public function drugs(){
+    public function drugs(Request $request){
         $judul = "Laporan Obat";
-        $stocks = Warehouse::paginate(5);
-        return view("pages.report.drug",compact('judul','stocks'));
+        $query = $request->input('query');
+        $startDate = $request->input('start');
+        $endDate = $request->input('end');
+        
+        if ($query) {
+            $drugs = Drug::where(function($q) use ($query) {
+                $q->where('name', 'like', "%{$query}%")
+                  ->orWhere('code', 'like', "%{$query}%");
+            })->get();
+        } else {
+            $drugs = Drug::all();
+        }
+        
+        $stocks = $drugs->map(function($drug) {
+            $warehouseStock = Warehouse::where('drug_id', $drug->id)->first();
+            $clinicStock = Clinic::where('drug_id', $drug->id)->first();
+            
+            $totalStock = ($warehouseStock ? $warehouseStock->quantity : 0) + 
+                         ($clinicStock ? $clinicStock->quantity : 0);
+            
+            $oldest = null;
+            $latest = null;
+            
+            if ($totalStock > 0) {
+                if ($warehouseStock && $warehouseStock->quantity > 0) {
+                    $oldest = $warehouseStock->oldest;
+                    $latest = $warehouseStock->latest;
+                }
+                if ($clinicStock && $clinicStock->quantity > 0) {
+                    if ($oldest === null || $clinicStock->oldest < $oldest) {
+                        $oldest = $clinicStock->oldest;
+                    }
+                    if ($latest === null || $clinicStock->latest > $latest) {
+                        $latest = $clinicStock->latest;
+                    }
+                }
+            }
+            
+            return (object)[
+                'drug' => $drug,
+                'quantity' => $totalStock,
+                'oldest' => $oldest,
+                'latest' => $latest
+            ];
+        });
+
+        if ($startDate && $endDate) {
+            $stocks = $stocks->filter(function($stock) use ($startDate, $endDate) {
+                $hasExpiringStock = false;
+                $warehouseStock = Warehouse::where('drug_id', $stock->drug->id)->first();
+                if ($warehouseStock && $warehouseStock->quantity > 0) {
+                    if ($warehouseStock->oldest && $warehouseStock->oldest >= $startDate && $warehouseStock->oldest <= $endDate) {
+                        $hasExpiringStock = true;
+                    }
+                    if ($warehouseStock->latest && $warehouseStock->latest >= $startDate && $warehouseStock->latest <= $endDate) {
+                        $hasExpiringStock = true;
+                    }
+                }
+                $clinicStock = Clinic::where('drug_id', $stock->drug->id)->first();
+                if ($clinicStock && $clinicStock->quantity > 0) {
+                    if ($clinicStock->oldest && $clinicStock->oldest >= $startDate && $clinicStock->oldest <= $endDate) {
+                        $hasExpiringStock = true;
+                    }
+                    if ($clinicStock->latest && $clinicStock->latest >= $startDate && $clinicStock->latest <= $endDate) {
+                        $hasExpiringStock = true;
+                    }
+                }
+                
+                return $hasExpiringStock;
+            });
+        }
+
+        $page = request()->get('page', 1);
+        $perPage = 5;
+        $stocks = new \Illuminate\Pagination\LengthAwarePaginator(
+            $stocks->forPage($page, $perPage),
+            $stocks->count(),
+            $perPage,
+            $page,
+            ['path' => request()->url(), 'query' => request()->query()]
+        );
+        
+        return view("pages.report.drug", compact('judul', 'stocks', 'startDate', 'endDate'));
     }
-    //Menambahkan drugDetail
-    public function drugDetail(Drug $stock)
+//Menambahkan drugDetail
+    public function drugDetail(Drug $stock, Request $request)
     {
         $judul = "Stok ".$stock->name;
         $drug = $stock;
-        $stock = Warehouse::where('drug_id',$drug->id)->first();
-        $inflow = Transaction::where('variant','LPB')->pluck('id');
-        $details = TransactionDetail::where('drug_id',$drug->id)->whereIn('transaction_id',$inflow)->whereNot('stock',0)->orderBy('expired')->paginate(10,['*'],'expired');
-        $transactions = TransactionDetail::with('transaction')->where('drug_id',$drug->id)->orderBy('created_at')->paginate(5,['*'],'transaction');
-        return view("pages.report.drugDetail",compact('drug','stock','judul','details','transactions'));
+        
+        $warehouseStock = Warehouse::where('drug_id', $drug->id)->first();
+        $clinicStock = Clinic::where('drug_id', $drug->id)->first();
+        
+        $warehouseDetails = TransactionDetail::with('transaction')
+            ->where('drug_id', $drug->id)
+            ->whereHas('transaction', function($q) {
+                $q->where('variant', 'LPB');
+            })
+            ->selectRaw('MIN(id) as id, expired, SUM(stock) as stock, drug_id, "LPB" as variant')
+            ->groupBy('expired', 'drug_id')
+            ->orderBy('expired');
+            
+        $clinicDetails = TransactionDetail::with('transaction')
+            ->where('drug_id', $drug->id)
+            ->whereHas('transaction', function($q) {
+                $q->where('variant', 'LPK');
+            })
+            ->selectRaw('MIN(id) as id, expired, SUM(stock) as stock, drug_id, "LPK" as variant')
+            ->groupBy('expired', 'drug_id')
+            ->orderBy('expired');
+            
+        $details = $warehouseDetails->union($clinicDetails)
+            ->orderBy('expired')
+            ->paginate(10, ['*'], 'expired');
+        
+        $transactionsQuery = TransactionDetail::with('transaction')
+            ->where('drug_id', $drug->id);
+            
+        if ($request->has('start') && $request->has('end')) {
+            $end = Carbon::parse($request->end)->endOfDay();
+            $transactionsQuery->whereHas('transaction', function($q) use ($request, $end) {
+                $q->whereBetween('created_at', [$request->start, $end]);
+            });
+        }
+        
+        $transactions = $transactionsQuery->orderBy('created_at')->paginate(5, ['*'], 'transaction');
+        
+        $totalStock = ($warehouseStock ? $warehouseStock->quantity : 0) + 
+                      ($clinicStock ? $clinicStock->quantity : 0);
+        
+        return view("pages.report.drugDetail", compact('drug', 'warehouseStock', 'clinicStock', 'judul', 'details', 'transactions', 'totalStock'));
     }
 
     public function drugPrint(){
@@ -59,19 +178,98 @@ class ReportController extends Controller
 
     }
     // menambahkan excel
-    public function exportExcel($transaction_id = null)
+    public function exportExcel(Request $request)
     {
-        return Excel::download(new ReportExport($transaction_id), 'Report.xlsx');
+        $startDate = $request->input('start');
+        $endDate = $request->input('end');
+        
+        $filename = 'laporan_obat';
+        if ($startDate && $endDate) {
+            $filename .= '_' . $startDate . '_to_' . $endDate;
+        }
+        $filename .= '.xlsx';
+        
+        return Excel::download(new ReportExport($startDate, $endDate), $filename);
     }
 
     // menambahkan pdf
-    public function generate()
+    public function generate(Request $request)
     {
-        $warehouses = Warehouse::with('data')->get();
+        $startDate = $request->input('start');
+        $endDate = $request->input('end');
+        
+        $drugs = Drug::all();
+        
+        $stocks = $drugs->map(function($drug) {
+            $warehouseStock = Warehouse::where('drug_id', $drug->id)->first();
+            $clinicStock = Clinic::where('drug_id', $drug->id)->first();
+            
+            $totalStock = ($warehouseStock ? $warehouseStock->quantity : 0) + 
+                         ($clinicStock ? $clinicStock->quantity : 0);
+            
+            $oldest = null;
+            $latest = null;
+            
+            if ($totalStock > 0) {
+                if ($warehouseStock && $warehouseStock->quantity > 0) {
+                    $oldest = $warehouseStock->oldest;
+                    $latest = $warehouseStock->latest;
+                }
+                if ($clinicStock && $clinicStock->quantity > 0) {
+                    if ($oldest === null || $clinicStock->oldest < $oldest) {
+                        $oldest = $clinicStock->oldest;
+                    }
+                    if ($latest === null || $clinicStock->latest > $latest) {
+                        $latest = $clinicStock->latest;
+                    }
+                }
+            }
+            
+            return (object)[
+                'drug' => $drug,
+                'quantity' => $totalStock,
+                'oldest' => $oldest,
+                'latest' => $latest
+            ];
+        });
 
-        $pdf = Pdf::loadView('pages.report.pdf.pdfreport', compact('warehouses'));
+        if ($startDate && $endDate) {
+            $stocks = $stocks->filter(function($stock) use ($startDate, $endDate) {
+                $hasExpiringStock = false;
+                
+                $warehouseStock = Warehouse::where('drug_id', $stock->drug->id)->first();
+                if ($warehouseStock && $warehouseStock->quantity > 0) {
+                    if ($warehouseStock->oldest && $warehouseStock->oldest >= $startDate && $warehouseStock->oldest <= $endDate) {
+                        $hasExpiringStock = true;
+                    }
+                    if ($warehouseStock->latest && $warehouseStock->latest >= $startDate && $warehouseStock->latest <= $endDate) {
+                        $hasExpiringStock = true;
+                    }
+                }
+                
+                $clinicStock = Clinic::where('drug_id', $stock->drug->id)->first();
+                if ($clinicStock && $clinicStock->quantity > 0) {
+                    if ($clinicStock->oldest && $clinicStock->oldest >= $startDate && $clinicStock->oldest <= $endDate) {
+                        $hasExpiringStock = true;
+                    }
+                    if ($clinicStock->latest && $clinicStock->latest >= $startDate && $clinicStock->latest <= $endDate) {
+                        $hasExpiringStock = true;
+                    }
+                }
+                
+                return $hasExpiringStock;
+            });
+        }
 
-        return $pdf->download('laporan_stok.pdf'); // Tanpa format tanggal
+        $filename = 'laporan_obat';
+        if ($startDate && $endDate) {
+            $filename .= '_' . $startDate . '_to_' . $endDate;
+        }
+        $filename .= '.pdf';
+
+        $pdf = Pdf::loadView('pages.report.pdf.pdfreport', compact('stocks', 'startDate', 'endDate'));
+
+        return $pdf->download($filename);
     }
 
 

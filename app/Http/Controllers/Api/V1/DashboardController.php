@@ -21,6 +21,7 @@ class DashboardController extends ApiController
      *     path="/api/v1/dashboard/obat",
      *     summary="Get top selling drugs",
      *     tags={"Dashboard"},
+     *     security={{"bearerAuth":{}}},
      *     @OA\Response(
      *         response=200,
      *         description="Top selling drugs retrieved successfully",
@@ -70,6 +71,7 @@ class DashboardController extends ApiController
      *     path="/api/v1/dashboard/penjualan",
      *     summary="Get weekly sales data",
      *     tags={"Dashboard"},
+     *     security={{"bearerAuth":{}}},
      *     @OA\Response(
      *         response=200,
      *         description="Weekly sales data retrieved successfully",
@@ -155,6 +157,7 @@ class DashboardController extends ApiController
      *     path="/api/v1/dashboard/histories",
      *     summary="Get recent transaction histories",
      *     tags={"Dashboard"},
+     *     security={{"bearerAuth":{}}},
      *     @OA\Parameter(
      *         name="per_page",
      *         in="query",
@@ -211,6 +214,7 @@ class DashboardController extends ApiController
      *     path="/api/v1/dashboard/due-bills",
      *     summary="Get due bills",
      *     tags={"Dashboard"},
+     *     security={{"bearerAuth":{}}},
      *     @OA\Response(
      *         response=200,
      *         description="Due bills retrieved successfully",
@@ -252,6 +256,7 @@ class DashboardController extends ApiController
      *     path="/api/v1/dashboard/low-stock",
      *     summary="Get low stock alerts",
      *     tags={"Dashboard"},
+     *     security={{"bearerAuth":{}}},
      *     @OA\Response(
      *         response=200,
      *         description="Low stock alerts retrieved successfully",
@@ -311,6 +316,7 @@ class DashboardController extends ApiController
      *     path="/api/v1/dashboard/expiring",
      *     summary="Get expiring drugs",
      *     tags={"Dashboard"},
+     *     security={{"bearerAuth":{}}},
      *     @OA\Response(
      *         response=200,
      *         description="Expiring drugs retrieved successfully",

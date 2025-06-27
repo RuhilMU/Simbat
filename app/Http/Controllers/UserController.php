@@ -16,7 +16,7 @@ class UserController extends Controller
     public function index()
     {
         $judul = "Manajemen Akun";
-        $users = User::all();
+        $users = User::paginate(10);
         return view('pages.super.user', compact('judul', 'users'));
     }
     public function store(Request $request)
@@ -57,10 +57,14 @@ class UserController extends Controller
     public function destroy(User $user)
     {
         try {
+            if ($user->id === auth()->id() && $user->role === 'super') {
+                return back()->with('error', 'Tidak dapat menghapus Super Admin');
+            }
+            
             $user->delete();
             return back()->with('success', 'User behasil dihapus');
         } catch (\Throwable $th) {
-            return back()->with('success', 'User behasil dihapus');
+            return back()->with('error', 'Gagal menghapus user');
         }
     }
     public function login(Request $request)

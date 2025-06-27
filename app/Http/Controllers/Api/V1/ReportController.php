@@ -23,6 +23,7 @@ class ReportController extends ApiController
      *     path="/api/v1/reports/drugs",
      *     summary="Get drug inventory report",
      *     tags={"Reports"},
+     *     security={{"bearerAuth":{}}},
      *     @OA\Parameter(
      *         name="per_page",
      *         in="query",
@@ -74,6 +75,7 @@ class ReportController extends ApiController
      *     path="/api/v1/reports/drugs/{id}",
      *     summary="Get detailed drug report",
      *     tags={"Reports"},
+     *     security={{"bearerAuth":{}}},
      *     @OA\Parameter(
      *         name="id",
      *         in="path",
@@ -192,6 +194,7 @@ class ReportController extends ApiController
      *     path="/api/v1/reports/transactions",
      *     summary="Get transaction report",
      *     tags={"Reports"},
+     *     security={{"bearerAuth":{}}},
      *     @OA\Parameter(
      *         name="start",
      *         in="query",
@@ -241,7 +244,7 @@ class ReportController extends ApiController
         $formattedTransactions = $transactions->map(function ($transaction) {
             $outcome = match ($transaction->variant) {
                 'LPB' => $transaction->outcome,
-                'LPK' => $transaction->details->sum('total_price'),
+                'LPK' => $transaction->detail->sum('total_price'),
                 'Checkout' => $transaction->income,
                 'Retur' => 0,
                 'Trash' => -$transaction->loss,
@@ -259,64 +262,6 @@ class ReportController extends ApiController
         return response()->json([
             'status' => 'success',
             'message' => 'Transaction report retrieved successfully',
-            'data' => $formattedTransactions
-        ]);
-    }
-
-    /**
-     * @OA\Get(
-     *     path="/api/v1/reports/transactions/search",
-     *     summary="Search transactions",
-     *     tags={"Reports"},
-     *     @OA\Parameter(
-     *         name="query",
-     *         in="query",
-     *         required=true,
-     *         description="Search query for transaction code",
-     *         @OA\Schema(type="string")
-     *     ),
-     *     @OA\Response(
-     *         response=200,
-     *         description="Transaction search results",
-     *         @OA\JsonContent(
-     *             @OA\Property(property="status", type="string", example="success"),
-     *             @OA\Property(property="data", type="array", @OA\Items(
-     *                 @OA\Property(property="code", type="string", example="TRX-1234567890"),
-     *                 @OA\Property(property="date", type="string", format="date-time", example="2024-01-01 10:00:00"),
-     *                 @OA\Property(property="variant", type="string", example="LPB"),
-     *                 @OA\Property(property="outcome", type="number", format="float", example=100000)
-     *             ))
-     *         )
-     *     )
-     * )
-     */
-    public function searchTransactions(Request $request)
-    {
-        $query = $request->input('query');
-        $transactions = Transaction::where('code', 'like', "%{$query}%")
-            ->with('details')
-            ->get();
-
-        $formattedTransactions = $transactions->map(function ($transaction) {
-            $outcome = match ($transaction->variant) {
-                'LPB' => $transaction->outcome,
-                'LPK' => $transaction->details->sum('total_price'),
-                'Checkout' => $transaction->income,
-                'Retur' => 0,
-                'Trash' => -$transaction->loss,
-                default => 0
-            };
-
-            return [
-                'code' => $transaction->code,
-                'date' => Carbon::parse($transaction->created_at)->format('Y-m-d H:i:s'),
-                'variant' => $transaction->variant,
-                'outcome' => $outcome
-            ];
-        });
-
-        return response()->json([
-            'status' => 'success',
             'data' => $formattedTransactions
         ]);
     }

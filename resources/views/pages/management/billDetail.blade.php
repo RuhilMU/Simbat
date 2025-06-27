@@ -93,14 +93,14 @@
                 <p class="text-sm text-gray-500 mb-5">Pilihlah salah satu format file!</p>
             </div>
             <div class="flex justify-center space-x-4">
-                <button onclick=""
+                <a href="{{ route('management.bill.export.excel', $bill->id) }}"
                     class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-blue-500 hover:text-white focus:outline-none">
                     Excel
-                </button>
-                <button onclick="" type="button"
+                </a>
+                <a href="{{ route('management.bill.export.pdf', $bill->id) }}" type="button"
                     class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-blue-500 hover:text-white focus:outline-none">
                     PDF
-                </button>
+                </a>
             </div>
         </div>
     </div>

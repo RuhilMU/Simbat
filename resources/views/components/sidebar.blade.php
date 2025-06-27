@@ -25,7 +25,7 @@
                 @if (str_contains(request()->route()->getName(), 'dashboard')) bg-blue-500 text-white hover:bg-gray-400
                 @else
                     bg-white text-gray-900 hover:bg-gray-300 @endif
-                rounded-lg group mb-4">
+                rounded-lg group mb-4 relative">
                     <svg width="22" height="19" viewBox="0 0 22 19" fill="none"
                         xmlns="http://www.w3.org/2000/svg">
                         <path
@@ -33,13 +33,44 @@
                             fill="@if (str_contains(request()->route()->getName(), 'dashboard')) white @else black @endif" />
                     </svg>
                     <span class="ms-3">Dashboards</span>
-                    {{-- <span
-                        class="inline-flex items-center justify-center w-6 h-6 p-2 ml-8 text-sm font-medium text-red-800 bg-red-100 rounded-full dark:bg-orange-600 dark:text-white">6</span> --}}
+                    @php
+                        // Get due bills
+                        $jatuhTempo = DB::table('bills')
+                            ->join('transactions', 'bills.transaction_id', '=', 'transactions.id')
+                            ->join('vendors', 'transactions.vendor_id', '=', 'vendors.id')
+                            ->where('bills.status', 'Belum Bayar')
+                            ->count();
+                        
+                        // Get low stock alerts from warehouse
+                        $gudangMenipis = DB::table('warehouse_inventory')
+                            ->join('drugs', 'warehouse_inventory.drug_id', '=', 'drugs.id')
+                            ->whereColumn('warehouse_inventory.quantity', '<=', 'drugs.minimum_capacity')
+                            ->count();
+                            
+                        // Get low stock alerts from clinic
+                        $klinikMenipis = DB::table('clinic_inventory')
+                            ->join('drugs', 'clinic_inventory.drug_id', '=', 'drugs.id')
+                            ->whereColumn('clinic_inventory.quantity', '<=', 'drugs.minimum_capacity')
+                            ->count();
+                        
+                        // Get expiring drugs
+                        $expired = DB::table('transaction_details')
+                            ->join('drugs', 'transaction_details.drug_id', '=', 'drugs.id')
+                            ->where('transaction_details.expired', '<=', now()->addDays(30))
+                            ->where('transaction_details.stock', '>', 0)
+                            ->count();
+                        
+                        // Sum up all notifications
+                        $totalNotifications = $jatuhTempo + $gudangMenipis + $klinikMenipis + $expired;
+                    @endphp
+                    @if($totalNotifications > 0)
+                        <span class="absolute right-2 top-1/2 -translate-y-1/2 bg-red-500 text-white text-xs font-bold px-2 py-1 rounded-full min-w-[20px] text-center">
+                            {{ $totalNotifications }}
+                        </span>
+                    @endif
                 </a>
             </li>
-            @if (auth()->user()->role != 'doctor')
-
-
+            @if (auth()->user()->role != 'doctor' && auth()->user()->role != 'clinic')
             <li>
                 <button type="button"
                     class="flex items-center w-full p-2 text-base transition duration-75 rounded-lg group
@@ -216,6 +247,7 @@
                 </ul>
             </li>
             @endif
+            @if (auth()->user()->role != 'clinic')
             <li>
                 <button type="button"
                     class="flex items-center w-full p-2 text-base transition duration-75 rounded-lg group
@@ -277,7 +309,7 @@
                     </li>
                 </ul>
             </li>
-            @if (auth()->user()->role != 'doctor')
+            @if (auth()->user()->role != 'doctor' && auth()->user()->role != 'clinic')
             <li>
                 <button type="button"
                     class="flex items-center w-full p-2 text-base transition duration-75 rounded-lg group
@@ -360,9 +392,6 @@
                         <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                             d="m1 1 4 4 4-4" />
                     </svg>
-
-
-
                 </button>
                 <ul id="dropdown-manajementransaksi" aria-expanded="false"
                     class="py-2 space-y-2
@@ -420,6 +449,7 @@
                     </li>
                 </ul>
             </li>
+            @endif
             @endif
             <li>
                 <a href="{{ route('user.index') }}"

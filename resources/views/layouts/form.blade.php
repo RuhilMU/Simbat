@@ -10,7 +10,7 @@
     </head>
 
     <body class="flex min-h-screen flex-col items-center justify-center">
-        <img src="{{ asset('assets/logo simbat.png') }}" class="w-18" alt="" />
+        <img src="{{ Storage::url(App\Models\Profile::first()->logo) }}" class="w-18" alt="" />
         @session('success')
         @include('components.toast_success')
     @endsession
